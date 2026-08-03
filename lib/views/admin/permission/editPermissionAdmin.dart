@@ -50,7 +50,7 @@ class _EditpermissionadminState extends State<Editpermissionadmin> {
           children: [
             InkWell(
               onTap: (){
-                controller.setPage(Adminroutes.permissions);
+                controller.backPage();
               },
               borderRadius: BorderRadius.circular(15),
               child: Padding(
@@ -58,7 +58,25 @@ class _EditpermissionadminState extends State<Editpermissionadmin> {
                 child: Icon(CupertinoIcons.back),
               )
             ),
-            Text("Editar datos del permiso", style: GoogleFonts.poppins(fontSize: 18),)
+            Text("Editar datos del permiso", style: GoogleFonts.poppins(fontSize: 18),),
+            TextButton(
+              onPressed: () async {
+                loading ? null : await _submit();
+              },
+              child: Center(
+                child: loading
+                    ? CircularProgressIndicator(
+                  color: Global.primary,
+                )
+                    : Text(
+                  'Guardar',
+                  style: TextStyle(
+                    color: Global.text,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            )
           ],
         ),
         SizedBox(height: 10,),
@@ -74,31 +92,6 @@ class _EditpermissionadminState extends State<Editpermissionadmin> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _input(nombreController, 'Nombre', Icons.security),
-
-                const SizedBox(height: 24),
-
-                /// ✅ BOTÓN
-                InkWell(
-                  onTap: loading ? null : _submit,
-                  child: Container(
-                    height: 50,
-                    decoration: Wapp.ButtonDecorationGradient(
-                      Global.secondary,
-                      Global.secondary,
-                    ),
-                    child: Center(
-                      child: loading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                        'Editar permiso',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -114,18 +107,24 @@ class _EditpermissionadminState extends State<Editpermissionadmin> {
         bool required = true,
         TextInputType keyboardType = TextInputType.text,
       }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: Wapp.TextFieldDecoration(
-        Global.primary,
-        true,
-        hint,
-        icon,
-      ),
-      validator: required
-          ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
-          : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(hint),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: Wapp.TextFieldDecoration(
+            Global.primary,
+            true,
+            hint,
+            icon,
+          ),
+          validator: required
+              ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
+              : null,
+        ),
+      ],
     );
   }
 
@@ -141,7 +140,7 @@ class _EditpermissionadminState extends State<Editpermissionadmin> {
         permissionController: permissionController
       );
 
-      controller.setPage(Adminroutes.permissions);
+      controller.backPage();
 
     } catch (e) {
       Get.snackbar(

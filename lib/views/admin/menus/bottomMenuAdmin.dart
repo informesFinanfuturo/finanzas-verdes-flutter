@@ -29,7 +29,32 @@ class _BottommenuadminState extends State<Bottommenuadmin> {
         height: 75,
         width: double.infinity,
         decoration: BoxDecoration(
-            color: Global.container
+          color: Global.container,
+          boxShadow: [
+            // 🌫 sombra principal (volumen)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              offset: Offset(0, 8),
+              blurRadius: 20,
+              spreadRadius: -5,
+            ),
+
+            // 💡 sombra suave (profundidad)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              offset: Offset(0, 4),
+              blurRadius: 10,
+              spreadRadius: -2,
+            ),
+
+            // 🔷 toque moderno (muy sutil color)
+            BoxShadow(
+              color: Global.primary.withOpacity(0.05),
+              offset: Offset(0, 2),
+              blurRadius: 8,
+              spreadRadius: 0,
+            ),
+          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,

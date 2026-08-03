@@ -41,7 +41,7 @@ class _NewpermissionadminState extends State<Newpermissionadmin> {
           children: [
             InkWell(
               onTap: (){
-                controller.setPage(Adminroutes.permissions);
+                controller.backPage();
               },
               borderRadius: BorderRadius.circular(15),
               child: Padding(
@@ -105,18 +105,24 @@ class _NewpermissionadminState extends State<Newpermissionadmin> {
         bool required = true,
         TextInputType keyboardType = TextInputType.text,
       }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: Wapp.TextFieldDecoration(
-        Global.primary,
-        true,
-        hint,
-        icon,
-      ),
-      validator: required
-          ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
-          : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(hint),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: Wapp.TextFieldDecoration(
+            Global.primary,
+            true,
+            hint,
+            icon,
+          ),
+          validator: required
+              ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
+              : null,
+        ),
+      ],
     );
   }
 
@@ -131,7 +137,7 @@ class _NewpermissionadminState extends State<Newpermissionadmin> {
         permissionController: Get.find<PermissionController>()
       );
 
-      controller.setPage(Adminroutes.permissions);
+      controller.backPage();
 
     } catch (e) {
       Get.snackbar(

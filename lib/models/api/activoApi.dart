@@ -4,17 +4,19 @@ import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/controllers/RolController.dart';
 import 'package:finanzas_verdes/controllers/UserController.dart';
 import 'package:finanzas_verdes/main.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
-Future<void> createActivoApi({
+Future<Map> createActivoApi({
   required String nombre,
   required String tipo,
   required int idMipyme,
   required int createdBy,
-
+  required String marca,
+  String? modelo,
   String? descripcion,
   Map<String, dynamic>? datos,
 }) async {
@@ -34,23 +36,26 @@ Future<void> createActivoApi({
         // ✅ OBLIGATORIOS
         'nombre': nombre,
         'tipo': tipo,
+        'marca': marca,
         'id_mipyme': idMipyme,
         'created_by': createdBy,
 
         // ✅ OPCIONALES
         if (descripcion != null) 'descripcion': descripcion,
         if (datos != null) 'datos': datos,
+        if (modelo != null) 'modelo': modelo,
       }),
     );
 
     if (response.statusCode == 201) {
       print("Activo creado correctamente");
-      return;
+      final result = jsonDecode(response.body);
+      return result["activo"];
     }
 
     if (response.statusCode == 401) {
       controller.logOut();
-      return;
+      return {};
     }
 
     if (response.statusCode == 400 || response.statusCode == 404) {
@@ -114,6 +119,8 @@ Future<void> updateActivoApi({
   String? nombre,
   String? tipo,
   String? descripcion,
+  String? modelo,
+  String? marca,
   Map<String, dynamic>? datos,
   String? estadoActivo,
 }) async {
@@ -136,6 +143,8 @@ Future<void> updateActivoApi({
         if (descripcion != null) 'descripcion': descripcion,
         if (datos != null) 'datos': datos,
         if (estadoActivo != null) 'estado_activo': estadoActivo,
+        if (modelo != null) 'modelo': modelo,
+        if (marca != null) 'marca': marca,
 
         // ✅ SIEMPRE
         'updated_by': updatedBy,
@@ -248,6 +257,146 @@ Future<void> deleteImagenActivoApi({
 
   } catch (e) {
     print("ERROR DELETE IMAGEN: $e");
+    rethrow;
+  }
+}
+
+Future<void> analizarActivoApi({
+  required int idActivo,
+}) async {
+
+  final uri = Uri.parse('${Global.baseUrl}activo/analizar/$idActivo');
+  final token = GetStorage().read("token");
+
+  try {
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    /// ✅ PROTEGER JSON
+    Map<String, dynamic> data = {};
+    if (response.body.isNotEmpty) {
+      try {
+        data = jsonDecode(response.body);
+      } catch (_) {
+        data = {};
+      }
+    }
+
+    /// ✅ ÉXITO
+    if (response.statusCode == 200) {
+
+      Get.snackbar(
+        "IA",
+        "Activo analizado correctamente ✅",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      return;
+    }
+
+    /// ✅ AUTH
+    if (response.statusCode == 401) {
+      controller.logOut();
+      return;
+    }
+
+    /// ✅ ERROR IA 🔥 (te faltaba esto)
+    if (response.statusCode == 422) {
+
+      final mensaje = data["ai_error"]?["message_user"] ??
+          "La IA no pudo analizar el activo";
+
+      Get.snackbar(
+        "IA",
+        mensaje,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 4),
+      );
+
+      return;
+    }
+
+    /// ✅ ERRORES BACKEND
+    if (response.statusCode == 400 || response.statusCode == 404) {
+
+      final mensaje = data['error'] ?? 'Error al analizar activo';
+
+      Get.snackbar(
+        "Error",
+        mensaje,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      return;
+    }
+
+    /// ✅ OTROS
+    Get.snackbar(
+      "Error",
+      "Error inesperado (${response.statusCode})",
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
+
+  } catch (e) {
+    print("ERROR ANALIZAR ACTIVO: $e");
+
+    Get.snackbar(
+      "Error",
+      "No se pudo conectar con el servidor",
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+}
+
+Future<void> deleteActivoApi({
+  required int idActivo,
+}) async {
+
+  final uri = Uri.parse('${Global.baseUrl}activo/$idActivo');
+  final token = GetStorage().read("token");
+
+  try {
+    final response = await http.delete(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      print("Activo eliminado correctamente");
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      controller.logOut();
+      return;
+    }
+
+    if (response.statusCode == 400 || response.statusCode == 404) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['error'] ?? 'Error al eliminar activo');
+    }
+
+    throw Exception('Error inesperado (${response.statusCode})');
+
+  } catch (e) {
+    print("ERROR ELIMINAR ACTIVO : $e");
     rethrow;
   }
 }

@@ -1,13 +1,16 @@
 import 'package:finanzas_verdes/app/routes/subrutes/adminRoutes.dart';
+import 'package:finanzas_verdes/controllers/ProveedorController.dart';
 import 'package:finanzas_verdes/controllers/RolController.dart';
 import 'package:finanzas_verdes/controllers/UserController.dart';
 import 'package:finanzas_verdes/main.dart';
+import 'package:finanzas_verdes/models/api/proveedorApi.dart';
 import 'package:finanzas_verdes/models/api/rolApi.dart';
 import 'package:finanzas_verdes/models/api/userApi.dart';
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/utils/WidgetsApp.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -42,6 +45,7 @@ class _EdituseradminState extends State<Edituseradmin> {
 
   /// ✅ Roles por ahora en String
   final RolController rolController = Get.put(RolController());
+  final ProveedorController proveedorController = Get.put(ProveedorController());
   int? selectedRol;
   static int rolAsesor = 3;
   static int rolProveedor = 4;
@@ -65,16 +69,18 @@ class _EdituseradminState extends State<Edituseradmin> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
+
     getRolsApi(rolController: rolController);
+    getTipoProveedoresApi(proveedorController: proveedorController);
+
     final user = userController.user;
+
     documentoCtrl.text = user["documento"];
     nombreCtrl.text = user["nombre_usuario"];
     emailCtrl.text = user["email"];
     telefonoCtrl.text = user["telefono"] ?? '';
     selectedRol = user["rol"]["id_rol"];
-
 
     final extra = user["extra"];
 
@@ -88,6 +94,12 @@ class _EdituseradminState extends State<Edituseradmin> {
       calificacionCtrl.text = extra["calificacion"]?.toString() ?? '';
     }
 
+
+    if (extra != null && extra["tipos_proveedor"] != null) {
+      userController.tiposProveedor.clear();
+      userController.tiposProveedor.value =
+      List<int>.from(extra["tipos_proveedor"]);
+    }
   }
 
   @override
@@ -99,7 +111,7 @@ class _EdituseradminState extends State<Edituseradmin> {
           children: [
             InkWell(
                 onTap: (){
-                  controller.setPage(Adminroutes.users);
+                  controller.backPage();
                 },
                 borderRadius: BorderRadius.circular(15),
                 child: Padding(
@@ -107,127 +119,160 @@ class _EdituseradminState extends State<Edituseradmin> {
                   child: Icon(CupertinoIcons.back),
                 )
             ),
-            Text("Editar datos del usuario", style: GoogleFonts.poppins(fontSize: 18),)
+            Text("Editar datos del usuario", style: GoogleFonts.poppins(fontSize: 18),),
+            TextButton(
+              onPressed: () async {
+                loading ? null : await _submit();
+              },
+              child: Center(
+                child: loading
+                    ? CircularProgressIndicator(
+                  color: Global.primary,
+                )
+                    : Text(
+                  'Guardar',
+                  style: TextStyle(
+                    color: Global.text,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            )
           ],
         ),
         SizedBox(height: 10,),
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Global.container,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _input(documentoCtrl, 'Documento', Icons.badge),
-                const SizedBox(height: 12),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Global.container,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _input(documentoCtrl, 'Documento', Icons.badge),
+                    const SizedBox(height: 12),
 
-                _input(nombreCtrl, 'Nombre de usuario', Icons.person),
-                const SizedBox(height: 12),
+                    _input(nombreCtrl, 'Nombre de usuario', Icons.person),
+                    const SizedBox(height: 12),
 
-                _input(
-                  emailCtrl,
-                  'Email',
-                  Icons.email,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 12),
-
-                _input(
-                  telefonoCtrl,
-                  'Teléfono (opcional)',
-                  Icons.phone,
-                  required: false,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 12),
-
-                /// ✅ SELECT DE ROL
-                DropdownButtonFormField<String>(
-                  initialValue: userController.user["rol"]["id_rol"].toString(),
-                  decoration: Wapp.TextFieldDecoration(
-                    Global.primary,
-                    true,
-                    'Rol',
-                    Icons.security,
-                  ),
-                  items: rolController.Rols
-                      .map(
-                        (rol) => DropdownMenuItem(
-                      value: rol["id_rol"].toString(),
-                      child: Text(rol["nombre_rol"]),
+                    _input(
+                      emailCtrl,
+                      'Email',
+                      Icons.email,
+                      keyboardType: TextInputType.emailAddress,
                     ),
-                  )
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() => selectedRol = int.parse(value.toString()));
-                  },
-                  validator: (value) =>
-                  value == null ? 'Selecciona un rol' : null,
-                ),
+                    const SizedBox(height: 12),
 
-
-                const SizedBox(height: 12),
-
-// ✅ ASESOR
-                if (selectedRol == rolAsesor) ...[
-                  _input(nombreCargoCtrl, 'Nombre del cargo', Icons.work),
-                  const SizedBox(height: 12),
-                  _input(sedeCtrl, 'Sede', Icons.location_on),
-                  const SizedBox(height: 12),
-                ],
-
-// ✅ PROVEEDOR
-                if (selectedRol == rolProveedor) ...[
-                  _input(razonSocialCtrl, 'Razón social', Icons.business),
-                  const SizedBox(height: 12),
-                  _input(nitCtrl, 'NIT', Icons.credit_card),
-                  const SizedBox(height: 12),
-                  _input(direccionCtrl, 'Dirección', Icons.location_on),
-                  const SizedBox(height: 12),
-
-                  TextFormField(
-                    controller: calificacionCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: Wapp.TextFieldDecoration(
-                      Global.primary,
-                      true,
-                      'Calificación (opcional)',
-                      Icons.star,
+                    _input(
+                      telefonoCtrl,
+                      'Teléfono (opcional)',
+                      Icons.phone,
+                      required: false,
+                      keyboardType: TextInputType.phone,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                    const SizedBox(height: 10),
+                    
+                    Text("Tipo de usuario"),
 
-                const SizedBox(height: 24),
+                    const SizedBox(height: 10),
 
-                /// ✅ BOTÓN
-                InkWell(
-                  onTap: loading ? null : _submit,
-                  child: Container(
-                    height: 50,
-                    decoration: Wapp.ButtonDecorationGradient(
-                      Global.secondary,
-                      Global.secondary,
-                    ),
-                    child: Center(
-                      child: loading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                        'Editar usuario',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w200,
-                            fontSize: 18
-                        ),
+                    /// ✅ SELECT DE ROL
+                    DropdownButtonFormField<String>(
+                      initialValue: userController.user["rol"]["id_rol"].toString(),
+                      decoration: Wapp.TextFieldDecoration(
+                        Global.primary,
+                        true,
+                        'Rol',
+                        Icons.security,
                       ),
+                      items: rolController.Rols
+                          .map(
+                            (rol) => DropdownMenuItem(
+                          value: rol["id_rol"].toString(),
+                          child: Text(rol["nombre_rol"]),
+                        ),
+                      )
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() => selectedRol = int.parse(value.toString()));
+                      },
+                      validator: (value) =>
+                      value == null ? 'Selecciona un rol' : null,
                     ),
-                  ),
+
+
+                    const SizedBox(height: 12),
+
+            // ✅ ASESOR
+                    if (selectedRol == rolAsesor) ...[
+                      _input(nombreCargoCtrl, 'Nombre del cargo', Icons.work),
+                      const SizedBox(height: 12),
+                      _input(sedeCtrl, 'Sede', Icons.location_on),
+                      const SizedBox(height: 12),
+                    ],
+
+            // ✅ PROVEEDOR
+                    if (selectedRol == rolProveedor) ...[
+                      _input(razonSocialCtrl, 'Razón social', Icons.business),
+                      const SizedBox(height: 12),
+                      _inputNumber(nitCtrl, 'NIT', Icons.credit_card),
+                      const SizedBox(height: 12),
+                      _input(direccionCtrl, 'Dirección', Icons.location_on),
+                      const SizedBox(height: 12),
+                      _inputNumber(calificacionCtrl, 'Calificación', Icons.star),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // ✅ CATEGORÍAS PROVEEDOR
+                    if (selectedRol == rolProveedor) ...[
+                      const SizedBox(height: 16),
+
+                      Text("Categorías", style: GoogleFonts.poppins()),
+                      Divider(),
+
+                      const SizedBox(height: 8),
+
+                      proveedorController.TiposProveedores.isEmpty
+                          ? Center(child: CircularProgressIndicator())
+                          : ListView.builder(
+                        shrinkWrap: true,
+                        physics: NeverScrollableScrollPhysics(),
+                        itemCount: proveedorController.TiposProveedores.length,
+                        itemBuilder: (context, i) {
+                          final tipo = proveedorController.TiposProveedores[i];
+
+                          final idTipo = tipo["id_tipo_proveedor"];
+
+                          final enabled = userController.tiposProveedor.contains(idTipo);
+
+                          return CheckboxListTile(
+                            value: enabled,
+
+                            onChanged: (value) {
+                              if (enabled) {
+                                userController.tiposProveedor.value.remove(idTipo);
+                              } else {
+                                userController.tiposProveedor.value.add(idTipo);
+                              }
+
+                              proveedorController.tiposProveedores.refresh();
+                            },
+
+                            title: Text(tipo["nombre_tipo"]),
+                          );
+                        },
+                      ),
+                    ],
+
+                    const SizedBox(height: 10),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -242,18 +287,54 @@ class _EdituseradminState extends State<Edituseradmin> {
         bool required = true,
         TextInputType keyboardType = TextInputType.text,
       }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: Wapp.TextFieldDecoration(
-        Global.primary,
-        true,
-        hint,
-        icon,
-      ),
-      validator: required
-          ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
-          : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(hint),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: Wapp.TextFieldDecoration(
+            Global.primary,
+            true,
+            hint,
+            icon,
+          ),
+          validator: required
+              ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
+              : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _inputNumber(
+      TextEditingController controller,
+      String hint,
+      IconData icon, {
+        bool required = true,
+      }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(hint),
+        TextFormField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: Wapp.TextFieldDecoration(
+            Global.primary,
+            true,
+            hint,
+            icon,
+          ),
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly
+          ],
+          validator: required
+              ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
+              : null,
+        ),
+      ],
     );
   }
 
@@ -267,26 +348,28 @@ class _EdituseradminState extends State<Edituseradmin> {
         idUsuario: userController.user["id_usuario"],
         updatedBy: controller.User["id_usuario"],
         userController: userController,
+
         documento: documentoCtrl.text,
         nombreUsuario: nombreCtrl.text,
         email: emailCtrl.text,
         telefono: telefonoCtrl.text,
         idRol: selectedRol,
 
-        // ✅ ASESOR
         nombreCargo: selectedRol == rolAsesor ? nombreCargoCtrl.text : null,
         sede: selectedRol == rolAsesor ? sedeCtrl.text : null,
 
-        // ✅ PROVEEDOR
         razonSocial: selectedRol == rolProveedor ? razonSocialCtrl.text : null,
         nit: selectedRol == rolProveedor ? nitCtrl.text : null,
         direccion: selectedRol == rolProveedor ? direccionCtrl.text : null,
         calificacion: selectedRol == rolProveedor
             ? double.tryParse(calificacionCtrl.text)
             : null,
+
+        // ✅ NUEVO
+        tiposProveedores: userController.tiposProveedor,
       );
 
-      controller.setPage(Adminroutes.users);
+      controller.backPage();
 
     } catch (e) {
       Get.snackbar(

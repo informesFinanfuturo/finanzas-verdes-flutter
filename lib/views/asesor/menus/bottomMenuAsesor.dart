@@ -1,6 +1,7 @@
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/app/routes/subrutes/adminRoutes.dart';
 import 'package:finanzas_verdes/app/routes/subrutes/asesorRoutes.dart';
+import 'package:finanzas_verdes/app/routes/subrutes/proveedorRoutes.dart';
 import 'package:finanzas_verdes/main.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -22,13 +23,20 @@ class _BottommenuasesorState extends State<Bottommenuasesor> {
       AsesorRoutes.editClient,
       AsesorRoutes.dashBoardClient,
       AsesorRoutes.newMipyme,
+      AsesorRoutes.newClientMipyme,
       AsesorRoutes.editMipyme,
       AsesorRoutes.newActivo,
       AsesorRoutes.editActivo,
       AsesorRoutes.newConsumo,
-      AsesorRoutes.editConsumo
+      AsesorRoutes.editConsumo,
+      AsesorRoutes.newDiagnostico,
+      AsesorRoutes.viewDiagnostico,
+      AsesorRoutes.newPlanTrabajo,
+      AsesorRoutes.editPlanTrabajo,
+      AsesorRoutes.viewPlanTrabajo,
+      AsesorRoutes.newRequerimiento,
     ]},
-    {"nombre" : "Más", "logo" : Icons.menu, "route" : Adminroutes.more, "inPage" : [Adminroutes.more]},
+    {"nombre" : "Más", "logo" : Icons.menu, "route" : AsesorRoutes.more, "inPage" : [AsesorRoutes.more]},
   ];
   @override
   Widget build(BuildContext context) {
@@ -39,7 +47,32 @@ class _BottommenuasesorState extends State<Bottommenuasesor> {
         height: 75,
         width: double.infinity,
         decoration: BoxDecoration(
-            color: Global.container
+          color: Global.container,
+          boxShadow: [
+            // 🌫 sombra principal (volumen)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              offset: Offset(0, 8),
+              blurRadius: 20,
+              spreadRadius: -5,
+            ),
+
+            // 💡 sombra suave (profundidad)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              offset: Offset(0, 4),
+              blurRadius: 10,
+              spreadRadius: -2,
+            ),
+
+            // 🔷 toque moderno (muy sutil color)
+            BoxShadow(
+              color: Global.primary.withOpacity(0.05),
+              offset: Offset(0, 2),
+              blurRadius: 8,
+              spreadRadius: 0,
+            ),
+          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,

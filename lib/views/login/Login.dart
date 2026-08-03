@@ -98,19 +98,19 @@ class _LoginState extends State<Login> {
                                     children: [
                                       Image.asset(
                                         Images.logo,
-                                        height: isWide ? 140 : 110,
+                                        height: isWide ? 140 : 80,
                                       ),
                                       Container(
                                         margin: EdgeInsets.only(left: 30, right: 10),
-                                        height: isWide ? 100 : 80,
+                                        height: isWide ? 100 : 60,
                                         width: 1,
                                         color: Global.text.withOpacity(0.3),
                                       ),
                                       SizedBox(width: 10,),
                                       Image.asset(
-                                        width: 130,
+                                        width: isWide ? 130 : 100,
                                         Images.logoFinanfuturo,
-                                        height: isWide ? 140 : 110,
+                                        height: isWide ? 140 : 80,
                                       ),
                                     ],
                                   ),

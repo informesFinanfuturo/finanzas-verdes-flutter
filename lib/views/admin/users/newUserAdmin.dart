@@ -1,13 +1,16 @@
 import 'package:finanzas_verdes/app/routes/subrutes/adminRoutes.dart';
+import 'package:finanzas_verdes/controllers/ProveedorController.dart';
 import 'package:finanzas_verdes/controllers/RolController.dart';
 import 'package:finanzas_verdes/controllers/UserController.dart';
 import 'package:finanzas_verdes/main.dart';
+import 'package:finanzas_verdes/models/api/proveedorApi.dart';
 import 'package:finanzas_verdes/models/api/rolApi.dart';
 import 'package:finanzas_verdes/models/api/userApi.dart';
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/utils/WidgetsApp.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -39,6 +42,8 @@ class _NewuseradminState extends State<Newuseradmin> {
 
   /// ✅ Roles por ahora en String
   final rolController = Get.find<RolController>();
+  final userController = Get.find<UserController>();
+  final ProveedorController proveedorController = Get.put(ProveedorController());
   int? selectedRol;
   static int rolAsesor = 3;
   static int rolProveedor = 4;
@@ -65,6 +70,8 @@ class _NewuseradminState extends State<Newuseradmin> {
     // TODO: implement initState
     super.initState();
     getRolsApi(rolController: rolController);
+    getTipoProveedoresApi(proveedorController: proveedorController);
+    userController.setTiposProveedor([]);
   }
 
   @override
@@ -83,7 +90,7 @@ class _NewuseradminState extends State<Newuseradmin> {
               children: [
                 InkWell(
                     onTap: (){
-                      controller.setPage(Adminroutes.users);
+                      controller.backPage();
                     },
                     borderRadius: BorderRadius.circular(15),
                     child: Padding(
@@ -95,146 +102,175 @@ class _NewuseradminState extends State<Newuseradmin> {
               ],
             ),
             SizedBox(height: 10,),
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Global.container,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _input(documentoCtrl, 'Documento', Icons.badge),
-                    const SizedBox(height: 12),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Global.container,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _input(documentoCtrl, 'Documento', Icons.badge),
+                          const SizedBox(height: 12),
 
-                    _input(nombreCtrl, 'Nombre de usuario', Icons.person),
-                    const SizedBox(height: 12),
+                          _input(nombreCtrl, 'Nombre de usuario', Icons.person),
+                          const SizedBox(height: 12),
 
-                    _input(
-                      emailCtrl,
-                      'Email',
-                      Icons.email,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 12),
-
-                    _input(
-                      telefonoCtrl,
-                      'Teléfono (opcional)',
-                      Icons.phone,
-                      required: false,
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 12),
-
-                    /// ✅ SELECT DE ROL
-                    DropdownButtonFormField<String>(
-                      decoration: Wapp.TextFieldDecoration(
-                        Global.primary,
-                        true,
-                        'Rol',
-                        Icons.security,
-                      ),
-                      items: rolController.Rols
-                          .map(
-                            (rol) => DropdownMenuItem(
-                          value: rol["id_rol"].toString(),
-                          child: Text(rol["nombre_rol"]),
-                        ),
-                      )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() => selectedRol = int.parse(value.toString()));
-                      },
-                      validator: (value) =>
-                      value == null ? 'Selecciona un rol' : null,
-                    ),
-                    const SizedBox(height: 12),
-
-// ✅ CAMPOS ASESOR
-                    if (selectedRol == rolAsesor) ...[
-                      _input(nombreCargoCtrl, 'Nombre del cargo', Icons.work),
-                      const SizedBox(height: 12),
-                      _input(sedeCtrl, 'Sede', Icons.location_on),
-                      const SizedBox(height: 12),
-                    ],
-
-// ✅ CAMPOS PROVEEDOR
-                    if (selectedRol == rolProveedor) ...[
-                      _input(razonSocialCtrl, 'Razón social', Icons.business),
-                      const SizedBox(height: 12),
-                      _input(nitCtrl, 'NIT', Icons.credit_card),
-                      const SizedBox(height: 12),
-                      _input(direccionCtrl, 'Dirección', Icons.location_on),
-                      const SizedBox(height: 12),
-
-                      TextFormField(
-                        controller: calificacionCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: Wapp.TextFieldDecoration(
-                          Global.primary,
-                          true,
-                          'Calificación (opcional)',
-                          Icons.star,
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-                    ],
-
-
-                    /// 🔒 Password
-                    TextFormField(
-                      controller: passwordCtrl,
-                      obscureText: !showPassword,
-                      decoration: Wapp.TextFieldDecoration(
-                        Global.primary,
-                        true,
-                        'Contraseña',
-                        Icons.lock,
-                      ).copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            showPassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: Global.primary,
+                          _input(
+                            emailCtrl,
+                            'Email',
+                            Icons.email,
+                            keyboardType: TextInputType.emailAddress,
                           ),
-                          onPressed: () {
-                            setState(() => showPassword = !showPassword);
-                          },
-                        ),
-                      ),
-                      validator: (v) =>
-                      v == null || v.isEmpty ? 'Campo obligatorio' : null,
-                    ),
-                    const SizedBox(height: 24),
+                          const SizedBox(height: 12),
 
-                    /// ✅ BOTÓN
-                    InkWell(
-                      onTap: loading ? null : _submit,
-                      child: Container(
-                        height: 50,
-                        decoration: Wapp.ButtonDecorationGradient(
-                          Global.primary,
-                          Global.secondary,
-                        ),
-                        child: Center(
-                          child: loading
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text(
-                            'Crear usuario',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                          _input(
+                            telefonoCtrl,
+                            'Teléfono (opcional)',
+                            Icons.phone,
+                            required: false,
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 12),
+
+                          Text("Rol"),
+                          DropdownButtonFormField<String>(
+                            decoration: Wapp.TextFieldDecoration(
+                              Global.primary,
+                              true,
+                              'Rol',
+                              Icons.security,
+                            ),
+                            items: rolController.Rols
+                                .map(
+                                  (rol) => DropdownMenuItem(
+                                value: rol["id_rol"].toString(),
+                                child: Text(rol["nombre_rol"]),
+                              ),
+                            )
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() => selectedRol = int.parse(value.toString()));
+                            },
+                            validator: (value) =>
+                            value == null ? 'Selecciona un rol' : null,
+                          ),
+                          const SizedBox(height: 12),
+
+                      // ✅ CAMPOS ASESOR
+                          if (selectedRol == rolAsesor) ...[
+                            _input(nombreCargoCtrl, 'Nombre del cargo', Icons.work),
+                            const SizedBox(height: 12),
+                            _input(sedeCtrl, 'Sede', Icons.location_on),
+                            const SizedBox(height: 12),
+                          ],
+
+                      // ✅ CAMPOS PROVEEDOR
+                          if (selectedRol == rolProveedor) ...[
+                            _input(razonSocialCtrl, 'Razón social', Icons.business),
+                            const SizedBox(height: 12),
+                            _inputNumber(nitCtrl, 'NIT', Icons.credit_card),
+                            const SizedBox(height: 12),
+                            _input(direccionCtrl, 'Dirección', Icons.location_on),
+                            const SizedBox(height: 12),
+                            _inputNumber(calificacionCtrl, 'Calificación', Icons.star),
+                            const SizedBox(height: 12),
+
+                            const SizedBox(height: 12),
+                          ],
+
+                          Text("Contraseña"),
+                          TextFormField(
+                            controller: passwordCtrl,
+                            obscureText: !showPassword,
+                            decoration: Wapp.TextFieldDecoration(
+                              Global.primary,
+                              true,
+                              'Contraseña',
+                              Icons.lock,
+                            ).copyWith(
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  showPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Global.primary,
+                                ),
+                                onPressed: () {
+                                  setState(() => showPassword = !showPassword);
+                                },
+                              ),
+                            ),
+                            validator: (v) =>
+                            v == null || v.isEmpty ? 'Campo obligatorio' : null,
+                          ),
+
+                          if(selectedRol == rolProveedor) ...[
+                            const SizedBox(height: 24),
+                            Text("Categorías", style: GoogleFonts.poppins(),),
+                            Divider(),
+                            const SizedBox(height: 24),
+
+
+                            proveedorController.TiposProveedores == [] ? Center(child: CircularProgressIndicator(),) :
+                            ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: proveedorController.TiposProveedores.length,
+                              itemBuilder: (context, i){
+                                final tipo = proveedorController.TiposProveedores[i];
+                                final enabled = userController.TiposProveedor.contains(tipo["id_tipo_proveedor"]);
+                                return CheckboxListTile(
+                                  value: enabled,
+                                  onChanged: (value) async {
+                                    if(enabled){
+                                      userController.tiposProveedor.value.remove(tipo["id_tipo_proveedor"]);
+                                    }else{
+                                      userController.tiposProveedor.value.add(tipo["id_tipo_proveedor"]);
+                                    }
+                                    proveedorController.tiposProveedores.refresh();
+                                  },
+                                  title: Text(tipo["nombre_tipo"]),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            Divider(),
+                          ],
+
+                          const SizedBox(height: 24),
+
+                          /// ✅ BOTÓN
+                          InkWell(
+                            onTap: loading ? null : _submit,
+                            child: Container(
+                              height: 50,
+                              decoration: Wapp.ButtonDecorationGradient(
+                                Global.primary,
+                                Global.secondary,
+                              ),
+                              child: Center(
+                                child: loading
+                                    ? const CircularProgressIndicator(color: Colors.white)
+                                    : const Text(
+                                  'Crear usuario',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -251,18 +287,54 @@ class _NewuseradminState extends State<Newuseradmin> {
         bool required = true,
         TextInputType keyboardType = TextInputType.text,
       }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: Wapp.TextFieldDecoration(
-        Global.primary,
-        true,
-        hint,
-        icon,
-      ),
-      validator: required
-          ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
-          : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(hint),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: Wapp.TextFieldDecoration(
+            Global.primary,
+            true,
+            hint,
+            icon,
+          ),
+          validator: required
+              ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
+              : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _inputNumber(
+      TextEditingController controller,
+      String hint,
+      IconData icon, {
+        bool required = true,
+      }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(hint),
+        TextFormField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: Wapp.TextFieldDecoration(
+            Global.primary,
+            true,
+            hint,
+            icon,
+          ),
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly
+          ],
+          validator: required
+              ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
+              : null,
+        ),
+      ],
     );
   }
 
@@ -293,9 +365,10 @@ class _NewuseradminState extends State<Newuseradmin> {
         calificacion: selectedRol == rolProveedor
             ? double.tryParse(calificacionCtrl.text)
             : null,
+        tiposProveedores: userController.TiposProveedor
       );
 
-      controller.setPage(Adminroutes.users);
+      controller.backPage();
 
     } catch (e) {
       Get.snackbar(

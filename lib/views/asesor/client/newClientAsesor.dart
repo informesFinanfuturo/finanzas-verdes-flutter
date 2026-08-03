@@ -53,7 +53,7 @@ class _NewclientasesorState extends State<Newclientasesor> {
           children: [
             InkWell(
               onTap: () {
-                controller.setPage(AsesorRoutes.clients);
+                controller.backPage();
               },
               borderRadius: BorderRadius.circular(15),
               child: const Padding(
@@ -196,7 +196,7 @@ class _NewclientasesorState extends State<Newclientasesor> {
         clientController: Get.find<ClientController>(),
       );
 
-      controller.setPage(AsesorRoutes.clients);
+      controller.backPage();
 
     } catch (e) {
       Get.snackbar(

@@ -9,12 +9,15 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main () async {
 
   await GetStorage.init();
+  await initializeDateFormatting('es');
   Get.put(Generalcontoller());
   runApp(Obx(() => GetMaterialApp(
+
     title: "Finanzas verdes",
     debugShowCheckedModeBanner: false,
     theme: ThemeData(

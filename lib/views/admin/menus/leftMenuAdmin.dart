@@ -36,7 +36,11 @@ class _LeftmenuadminState extends State<Leftmenuadmin> {
       "nombre": "Roles",
       "logo": Icons.admin_panel_settings,
       "route": Adminroutes.rols,
-      "inPage": [Adminroutes.rols]
+      "inPage": [
+        Adminroutes.rols,
+        Adminroutes.newRol,
+        Adminroutes.editRol,
+      ]
     },
     {
       "nombre": "Permisos",

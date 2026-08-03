@@ -52,7 +52,7 @@ class _EditroladminState extends State<Editroladmin> {
           children: [
             InkWell(
               onTap: (){
-                controller.setPage(Adminroutes.rols);
+                controller.backPage();
               },
               borderRadius: BorderRadius.circular(15),
               child: Padding(
@@ -60,7 +60,25 @@ class _EditroladminState extends State<Editroladmin> {
                 child: Icon(CupertinoIcons.back),
               )
             ),
-            Text("Editar datos del rol", style: GoogleFonts.poppins(fontSize: 18),)
+            Text("Editar datos del rol", style: GoogleFonts.poppins(fontSize: 18),),
+            TextButton(
+              onPressed: () async {
+                loading ? null : await _submit();
+              },
+              child: Center(
+                child: loading
+                    ? CircularProgressIndicator(
+                  color: Global.primary,
+                )
+                    : Text(
+                  'Guardar',
+                  style: TextStyle(
+                    color: Global.text,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            )
           ],
         ),
         SizedBox(height: 10,),
@@ -76,29 +94,6 @@ class _EditroladminState extends State<Editroladmin> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _input(nombreController, 'Nombre', Icons.security),
-
-                const SizedBox(height: 24),
-                InkWell(
-                  onTap: loading ? null : _submit,
-                  child: Container(
-                    height: 50,
-                    decoration: Wapp.ButtonDecorationGradient(
-                      Global.secondary,
-                      Global.secondary,
-                    ),
-                    child: Center(
-                      child: loading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                        'Editar rol',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -147,18 +142,24 @@ class _EditroladminState extends State<Editroladmin> {
         bool required = true,
         TextInputType keyboardType = TextInputType.text,
       }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: Wapp.TextFieldDecoration(
-        Global.primary,
-        true,
-        hint,
-        icon,
-      ),
-      validator: required
-          ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
-          : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(hint),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: Wapp.TextFieldDecoration(
+            Global.primary,
+            true,
+            hint,
+            icon,
+          ),
+          validator: required
+              ? (v) => v == null || v.isEmpty ? 'Campo obligatorio' : null
+              : null,
+        ),
+      ],
     );
   }
 
@@ -174,7 +175,7 @@ class _EditroladminState extends State<Editroladmin> {
         rolController: rolController
       );
 
-      controller.setPage(Adminroutes.rols);
+      controller.backPage();
 
     } catch (e) {
       Get.snackbar(

@@ -26,34 +26,40 @@ class _DashboardadminState extends State<Dashboardadmin> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    return Obx(() => Scaffold(
-      backgroundColor: Global.bg,
-      appBar: width >= 800 ? null : AppBarAdmin(),
-      body: Column(
-        children: [
-          Expanded(
-              child: Row(
-                children: [
-                  Leftmenuadmin(),
-                  Expanded(
-                    child: Container(
-                      height: double.infinity,
-                      color: Global.bg,
-                      padding: EdgeInsets.all(20),
-                      child: FadeInDown(
-                        key: ValueKey(controller.Page),
-                        duration: const Duration(milliseconds: 250),
-                        from: 20,
-                        child: controller.Pages[controller.Page],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        controller.backPage();
+      },
+      child: Obx(() => Scaffold(
+        backgroundColor: Global.bg,
+        appBar: width >= 800 ? null : AppBarAdmin(),
+        body: Column(
+          children: [
+            Expanded(
+                child: Row(
+                  children: [
+                    Leftmenuadmin(),
+                    Expanded(
+                      child: Container(
+                        height: double.infinity,
+                        color: Global.bg,
+                        padding: EdgeInsets.all(20),
+                        child: FadeInDown(
+                          key: ValueKey(controller.Page),
+                          duration: const Duration(milliseconds: 250),
+                          from: 20,
+                          child: controller.Pages[controller.Page],
+                        ),
                       ),
-                    ),
-                  )
-                ],
-              )
-          ),
-          Bottommenuadmin()
-        ],
-      ),
-    ));
+                    )
+                  ],
+                )
+            ),
+            SafeArea(child: Bottommenuadmin())
+          ],
+        ),
+      )),
+    );
   }
 }

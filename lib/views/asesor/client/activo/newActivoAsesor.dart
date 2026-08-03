@@ -28,14 +28,27 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
 
   // ✅ CAMPOS MIPYME
   final nombreCtrl = TextEditingController();
-  final tipoCtrl = TextEditingController();
+  String tipoSeleccionado = "Electrodoméstico";
   final descripcionCtrl = TextEditingController();
+  final marcaCtrl = TextEditingController();
+  final modeloCtrl = TextEditingController();
+
+  final List<String> tipos = [
+    "Electrodoméstico",
+    "Iluminación",
+    "Climatización",
+    "Equipos de cocina",
+    "Maquinaria",
+    "Sistemas de bombeo",
+    "Computo",
+    "Otro"
+  ];
+
   bool loading = false;
 
   @override
   void dispose() {
     nombreCtrl.dispose();
-    tipoCtrl.dispose();
     descripcionCtrl.dispose();
     super.dispose();
   }
@@ -51,7 +64,7 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
           children: [
             InkWell(
               onTap: () {
-                controller.setPage(AsesorRoutes.dashBoardClient);
+                controller.backPage();
               },
               borderRadius: BorderRadius.circular(15),
               child: const Padding(
@@ -61,54 +74,75 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
             ),
             Text("Registrar Activo",
                 style: GoogleFonts.poppins(fontSize: 18)),
+            TextButton(
+                onPressed: (){
+                  _submit();
+                },
+                child: Text("Guardar", style: TextStyle(fontSize: 18),)
+            )
           ],
         ),
 
         const SizedBox(height: 10),
 
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Global.container,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Global.container,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
 
-                  _input(nombreCtrl, "Nombre del activo", Icons.inventory,),
-                  const SizedBox(height: 12),
+                      _input(nombreCtrl, "Nombre del activo", Icons.inventory,),
+                      const SizedBox(height: 12),
 
-                  _input(tipoCtrl, "Tipo de activo", Icons.category),
-                  const SizedBox(height: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Tipo de activo"),
+                          DropdownButtonFormField<String>(
+                            value: tipoSeleccionado,
+                            items: tipos.map((tipo) {
+                              return DropdownMenuItem(
+                                value: tipo,
+                                child: Text(tipo),
+                              );
+                            }).toList(),
 
-                  _input(descripcionCtrl, "Descripción (opcional)", Icons.description, required: false),
-                  const SizedBox(height: 24),
+                            onChanged: (value) {
+                              setState(() {
+                                tipoSeleccionado = value!;
+                              });
+                            },
 
-                  InkWell(
-                    onTap: loading ? null : _submit,
-                    child: Container(
-                      height: 50,
-                      decoration: Wapp.ButtonDecorationGradient(
-                        Global.primary,
-                        Global.secondary,
-                      ),
-                      child: Center(
-                        child: loading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                          'Guardar Activo',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                            decoration: Wapp.TextFieldDecoration(
+                              Global.primary,
+                              true,
+                              "Tipo",
+                              Icons.category,
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ),
-                  ),
-                ],
-              )
+                      const SizedBox(height: 12),
+
+                      _input(marcaCtrl, "Marca", Icons.branding_watermark),
+                      const SizedBox(height: 12),
+
+                      _input(modeloCtrl, "Modelo", Icons.precision_manufacturing),
+                      const SizedBox(height: 12),
+
+                      _inputArea(descripcionCtrl, "Ejemplo: frecuencia de uso, reparaciones, daños, modificaciones, ubicación, antigüedad, etc.", Icons.description, "Observaciones del activo", required: false),
+                      const SizedBox(height: 24),
+                    ],
+                  )
+              ),
+            ),
           ),
         ),
       ],
@@ -122,15 +156,21 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
       {bool required = false,
         TextInputType keyboardType = TextInputType.text}) {
 
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: Wapp.TextFieldDecoration(
-        Global.primary,
-        true,
-        hint,
-        icon,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(hint),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: Wapp.TextFieldDecoration(
+            Global.primary,
+            true,
+            hint,
+            icon,
+          ),
+        ),
+      ],
     );
   }
 
@@ -142,12 +182,14 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
     try {
       final clientController = Get.find<ClientController>();
 
-      await createActivoApi(
+      final activo = await createActivoApi(
         nombre: nombreCtrl.text,
-        tipo: tipoCtrl.text,
+        tipo: tipoSeleccionado!,
         descripcion: descripcionCtrl.text.isEmpty ? null : descripcionCtrl.text,
         idMipyme: clientController.Client["mipyme"]["id_mipyme"], // ✅ clave
         createdBy: controller.User["id_usuario"],
+        marca: marcaCtrl.text,
+        modelo: modeloCtrl.text.isEmpty ? null : modeloCtrl.text
       );
 
       // ✅ refrescar cliente (para traer activos nuevos)
@@ -157,16 +199,49 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
         ),
       );
 
-      controller.setPage(AsesorRoutes.dashBoardClient);
+      if(activo["id_activo"] != null){
+        controller.backPage();
+        clientController.setActivo(await getActivoApi(idActivo: activo["id_activo"]));
+        controller.setPage(AsesorRoutes.editActivo);
+      }
+
 
     } catch (e) {
       Get.snackbar(
         'Error',
         e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
       );
     } finally {
       setState(() => loading = false);
     }
+  }
+
+  Widget _inputArea(
+      TextEditingController controller,
+      String hint,
+      IconData icon,
+      String label,
+      {bool required = false,
+        TextInputType keyboardType = TextInputType.text}) {
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: Wapp.TextFieldDecoration(
+            Global.primary,
+            true,
+            hint,
+            icon,
+          ),
+          maxLines: 3,
+        ),
+      ],
+    );
   }
 }

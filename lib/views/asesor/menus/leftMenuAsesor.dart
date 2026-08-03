@@ -23,11 +23,18 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
       AsesorRoutes.editClient,
       AsesorRoutes.dashBoardClient,
       AsesorRoutes.newMipyme,
+      AsesorRoutes.newClientMipyme,
       AsesorRoutes.editMipyme,
       AsesorRoutes.newActivo,
       AsesorRoutes.editActivo,
       AsesorRoutes.newConsumo,
-      AsesorRoutes.editConsumo
+      AsesorRoutes.viewDiagnostico,
+      AsesorRoutes.editConsumo,
+      AsesorRoutes.newDiagnostico,
+      AsesorRoutes.newPlanTrabajo,
+      AsesorRoutes.editPlanTrabajo,
+      AsesorRoutes.viewPlanTrabajo,
+      AsesorRoutes.newRequerimiento,
     ]},
   ];
 
