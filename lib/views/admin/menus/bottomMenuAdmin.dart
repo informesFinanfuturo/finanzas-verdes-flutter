@@ -18,6 +18,7 @@ class _BottommenuadminState extends State<Bottommenuadmin> {
     {"nombre" : "Usuarios", "logo" : Icons.person, "route" : Adminroutes.users, "inPage" : [Adminroutes.users, Adminroutes.newUser, Adminroutes.editUser]},
     {"nombre" : "Roles", "logo" : Icons.admin_panel_settings, "route" : Adminroutes.rols, "inPage" : [Adminroutes.rols, Adminroutes.editRol, Adminroutes.newRol]},
     {"nombre" : "Permisos", "logo" : Icons.security, "route" : Adminroutes.permissions, "inPage" : [Adminroutes.permissions, Adminroutes.newPermission, Adminroutes.editPermission]},
+    {"nombre" : "Proveedores", "logo" : Icons.work, "route" : Adminroutes.homeProveedores, "inPage" : [Adminroutes.homeProveedores]},
     {"nombre" : "Más", "logo" : Icons.menu, "route" : Adminroutes.more, "inPage" : [Adminroutes.more]},
   ];
   @override

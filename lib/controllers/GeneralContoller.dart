@@ -14,6 +14,7 @@ import 'package:finanzas_verdes/views/admin/rols/newRolAdmin.dart';
 import 'package:finanzas_verdes/views/admin/screens/homeAdmin.dart';
 import 'package:finanzas_verdes/views/admin/screens/moreAdmin.dart';
 import 'package:finanzas_verdes/views/admin/screens/permissionAdmin.dart';
+import 'package:finanzas_verdes/views/admin/screens/proveedoresAdmin.dart';
 import 'package:finanzas_verdes/views/admin/screens/rolsAdmin.dart';
 import 'package:finanzas_verdes/views/admin/screens/usersAdmin.dart';
 import 'package:finanzas_verdes/views/admin/users/editUserAdmin.dart';
@@ -57,6 +58,8 @@ class Generalcontoller extends GetxController{
   final isDark = false.obs;
   final page = "".obs;
   final historyPages = [].obs;
+  final calendario = [].obs;
+  final agenda = [].obs;
   final pages = {
     // ADMINISTRADOR
     Adminroutes.home : Homeadmin(),
@@ -70,6 +73,7 @@ class Generalcontoller extends GetxController{
     Adminroutes.permissions : Permissionsadmin(),
     Adminroutes.newPermission : Newpermissionadmin(),
     Adminroutes.editPermission : Editpermissionadmin(),
+    Adminroutes.homeProveedores : Proveedoresadmin(),
 
     // ASESOR
     AsesorRoutes.home : Homeasesor(),
@@ -192,10 +196,20 @@ class Generalcontoller extends GetxController{
     }
   }
 
+  void setCalendario (List item){
+    calendario.value = item;
+  }
+
+  void setAgenda (List item){
+    agenda.value = item;
+  }
+
   ThemeMode get themeMode => isDark.value ? ThemeMode.dark : ThemeMode.light;
   Map get Pages => pages.value;
   String get Page => page.value;
   Map get User => user.value;
+  List get Calendario => calendario.value;
+  List get Agenda => agenda.value;
 
   @override
   void onInit() {

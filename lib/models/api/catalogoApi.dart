@@ -332,3 +332,58 @@ Future<void> deleteImagenItem({
     rethrow;
   }
 }
+
+Future<Map<String, dynamic>> testCatalogCrawler() async {
+
+  final uri = Uri.parse(
+    '${Global.baseUrl}catalogo/refresh',
+  );
+
+  final token = GetStorage().read("token");
+
+  try {
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+
+      final data =
+      jsonDecode(response.body);
+
+      Get.snackbar(
+        "Crawler",
+        "Contenido obtenido (${data["caracteres"]} caracteres)",
+      );
+
+      return data;
+    }
+
+    if (response.statusCode == 401) {
+      controller.logOut();
+      return {};
+    }
+
+    if (response.statusCode == 400 || response.statusCode == 404) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['error'] ?? 'Error crawler');
+    }
+
+    throw Exception('Error inesperado (${response.statusCode})');
+
+  } catch (e) {
+    print("ERROR AL OBTENER LA PÁGINA: $e");
+    rethrow;
+  }
+
+}
+
+void closeLoader() {
+  if (Get.isDialogOpen == true) {
+    Get.back(closeOverlays: true);
+  }
+}

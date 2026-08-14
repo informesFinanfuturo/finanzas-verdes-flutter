@@ -28,21 +28,10 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
 
   // ✅ CAMPOS MIPYME
   final nombreCtrl = TextEditingController();
-  String tipoSeleccionado = "Electrodoméstico";
+  String tipoSeleccionado = "Neveras";
   final descripcionCtrl = TextEditingController();
   final marcaCtrl = TextEditingController();
   final modeloCtrl = TextEditingController();
-
-  final List<String> tipos = [
-    "Electrodoméstico",
-    "Iluminación",
-    "Climatización",
-    "Equipos de cocina",
-    "Maquinaria",
-    "Sistemas de bombeo",
-    "Computo",
-    "Otro"
-  ];
 
   bool loading = false;
 
@@ -107,7 +96,7 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
                           Text("Tipo de activo"),
                           DropdownButtonFormField<String>(
                             value: tipoSeleccionado,
-                            items: tipos.map((tipo) {
+                            items: Global.tiposActivo.map((tipo) {
                               return DropdownMenuItem(
                                 value: tipo,
                                 child: Text(tipo),

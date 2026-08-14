@@ -212,4 +212,21 @@ class Global {
     "Hotel",
     "Cafetería",
   ];
+
+  static List<String> tiposActivo = [
+    "Neveras",
+    "Televisores",
+    "Hornos",
+    "Climatización",
+    "Vitrinas",
+    "Refrigeración",
+    "Secadoras",
+    "Iluminación",
+    "Lavadoras",
+    "Lava vajillas",
+    "Sanitarios",
+    "Orinales",
+    "Grifos",
+    "Otro"
+  ];
 }

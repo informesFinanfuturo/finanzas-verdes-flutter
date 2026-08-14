@@ -19,6 +19,7 @@ Future<Map> generarYSyncDiagnosticosApi({
   final token = GetStorage().read("token");
 
   try {
+    showLoadingDialog();
     final response = await http.post(
       uri,
       headers: {
@@ -35,6 +36,8 @@ Future<Map> generarYSyncDiagnosticosApi({
         if (diagnosticos != null) 'diagnosticos': diagnosticos,
       }),
     );
+
+    hideLoadingDialog();
 
     final data = jsonDecode(response.body);
 
@@ -110,6 +113,7 @@ Future<Map> generarYSyncDiagnosticosApi({
 
     throw Exception(data["error"] ?? 'Error inesperado (${response.statusCode})');
   } catch (e) {
+    hideLoadingDialog();
     print("ERROR GENERAR SYNC DIAGNOSTICOS: $e");
 
     Get.snackbar(
@@ -123,5 +127,43 @@ Future<Map> generarYSyncDiagnosticosApi({
     );
 
     rethrow;
+  }
+}
+
+void showLoadingDialog() {
+  Get.dialog(
+    PopScope(
+      canPop: false,
+      child: Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                "Generando análisis con IA",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                "Estamos analizando activos, facturas y extrayendo datos.",
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+    barrierDismissible: false,
+  );
+}
+
+void hideLoadingDialog() {
+  if (Get.isDialogOpen ?? false) {
+    Get.close(1);
   }
 }

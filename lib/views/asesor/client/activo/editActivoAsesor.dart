@@ -36,18 +36,6 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
   final modeloCtrl = TextEditingController();
   bool loading = false;
 
-  final List<String> tipos = [
-    "Electrodoméstico",
-    "Iluminación",
-    "Climatización",
-    "Equipos de cocina",
-    "Maquinaria",
-    "Sistemas de bombeo",
-    "Computo",
-    "Otro"
-  ];
-
-  // CAMPOS IMAGE
   XFile? selectedImage;
   bool uploadingImage = false;
 
@@ -127,7 +115,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
                               Text("Tipo de activo"),
                               DropdownButtonFormField<String>(
                                 initialValue: tipoSeleccionado,
-                                items: tipos.map((tipo) {
+                                items: Global.tiposActivo.map((tipo) {
                                   return DropdownMenuItem(
                                     value: tipo,
                                     child: Text(tipo),
@@ -181,7 +169,6 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
 
                           final isWeb = kIsWeb;
 
-                          // ✅ tamaños dinámicos
                           final width = isWeb
                               ? constraints.maxWidth * 0.7
                               : constraints.maxWidth;
@@ -215,11 +202,11 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
                                     child:
                                     kIsWeb
                                         ? Image.network(
-                                      selectedImage!.path, // ✅ web (blob url)
+                                      selectedImage!.path,
                                       fit: BoxFit.contain,
                                     )
                                         : Image.file(
-                                      File(selectedImage!.path), // ✅ móvil (archivo real)
+                                      File(selectedImage!.path),
                                       fit: BoxFit.contain,
                                     ),
 
@@ -351,17 +338,17 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Global.primary,      // color 1
+                        Global.primary,
                         Global.secondary
                       ],
                     ),
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  padding: EdgeInsets.all(1.5), // 🔥 grosor del borde
+                  padding: EdgeInsets.all(1.5),
                   child: Container(
                     decoration: BoxDecoration(
                       color: Global.bg,
-                      borderRadius: BorderRadius.circular(14), // un poco más pequeño
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(20.0),
@@ -429,17 +416,17 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Global.primary,      // color 1
+                        Global.primary,
                         Global.secondary
                       ],
                     ),
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  padding: EdgeInsets.all(1.5), // 🔥 grosor del borde
+                  padding: EdgeInsets.all(1.5),
                   child: Container(
                     decoration: BoxDecoration(
                       color: Global.bg,
-                      borderRadius: BorderRadius.circular(14), // un poco más pequeño
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(20.0),
@@ -457,7 +444,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
                           )
                           :
                           Center(
-                            child: Text(clientController.Activo["observacion_ia"]),
+                            child: SelectableText(clientController.Activo["observacion_ia"]),
                           )
                         ],
                       ),
@@ -578,7 +565,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
       final activo = Get.find<ClientController>().Activo;
 
       await updateActivoApi(
-        idActivo: activo["id_activo"], // ✅ clave
+        idActivo: activo["id_activo"],
         updatedBy: controller.User["id_usuario"],
 
         nombre: nombreCtrl.text,
@@ -590,7 +577,6 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
         modelo: modeloCtrl.text,
       );
 
-      // ✅ refrescar datos
       clientController.setClient(
         await getClientDetailApi(
           idUsuario: clientController.Client["user"]["id_usuario"],
@@ -614,7 +600,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
     final picker = ImagePicker();
 
     final image = await picker.pickImage(
-      source: ImageSource.gallery, // ✅ sirve en web y móvil
+      source: ImageSource.gallery,
     );
 
     if (image != null) {
@@ -642,8 +628,6 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
       );
 
       Get.find<ClientController>().setActivo(await getActivoApi(idActivo: activo["id_activo"]));
-
-      // ✅ RESET COMPLETO DEL PICKER
       setState(() {
         selectedImage = null;
       });
@@ -659,7 +643,6 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
 
   Future<void> takePhoto() async {
     if (kIsWeb) {
-      // ✅ Web sigue igual
       final picker = ImagePicker();
 
       final image = await picker.pickImage(

@@ -137,14 +137,13 @@ Future<void> updateActivoApi({
       },
       body: jsonEncode({
 
-        // ✅ SOLO LO QUE CAMBIA
-        if (nombre != null) 'nombre': nombre,
-        if (tipo != null) 'tipo': tipo,
-        if (descripcion != null) 'descripcion': descripcion,
-        if (datos != null) 'datos': datos,
-        if (estadoActivo != null) 'estado_activo': estadoActivo,
-        if (modelo != null) 'modelo': modelo,
-        if (marca != null) 'marca': marca,
+        'nombre': nombre,
+        'tipo': tipo,
+        'descripcion': descripcion,
+        'datos': datos,
+        if(estadoActivo != null) 'estado_activo': estadoActivo,
+        'modelo': modelo,
+        'marca': marca,
 
         // ✅ SIEMPRE
         'updated_by': updatedBy,
@@ -269,6 +268,7 @@ Future<void> analizarActivoApi({
   final token = GetStorage().read("token");
 
   try {
+    showLoadingDialog();
     final response = await http.post(
       uri,
       headers: {
@@ -276,6 +276,8 @@ Future<void> analizarActivoApi({
         'Authorization': 'Bearer $token',
       },
     );
+
+    hideLoadingDialog();
 
     /// ✅ PROTEGER JSON
     Map<String, dynamic> data = {};
@@ -350,6 +352,9 @@ Future<void> analizarActivoApi({
     );
 
   } catch (e) {
+
+    hideLoadingDialog();
+
     print("ERROR ANALIZAR ACTIVO: $e");
 
     Get.snackbar(
@@ -359,6 +364,10 @@ Future<void> analizarActivoApi({
       colorText: Colors.white,
       snackPosition: SnackPosition.BOTTOM,
     );
+  } finally {
+    if (Get.isDialogOpen ?? false) {
+      Get.back();
+    }
   }
 }
 
@@ -398,5 +407,43 @@ Future<void> deleteActivoApi({
   } catch (e) {
     print("ERROR ELIMINAR ACTIVO : $e");
     rethrow;
+  }
+}
+
+void showLoadingDialog() {
+  Get.dialog(
+    PopScope(
+      canPop: false,
+      child: Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                "Generando análisis con IA",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                "Estamos analizando imágenes y extrayendo datos.",
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+    barrierDismissible: false,
+  );
+}
+
+void hideLoadingDialog() {
+  if (Get.isDialogOpen ?? false) {
+    Get.close(1);
   }
 }

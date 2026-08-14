@@ -52,6 +52,7 @@ class _LeftmenuadminState extends State<Leftmenuadmin> {
         Adminroutes.editPermission
       ]
     },
+    {"nombre" : "Proveedores", "logo" : Icons.work, "route" : Adminroutes.homeProveedores, "inPage" : [Adminroutes.homeProveedores]},
   ];
 
   bool isCollapsed = false;

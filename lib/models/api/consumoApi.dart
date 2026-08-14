@@ -333,6 +333,7 @@ Future<void> analizarConsumoApi({
   final token = GetStorage().read("token");
 
   try {
+    showLoadingDialog();
     final response = await http.post(
       uri,
       headers: {
@@ -340,6 +341,8 @@ Future<void> analizarConsumoApi({
         'Authorization': 'Bearer $token',
       },
     );
+
+    hideLoadingDialog();
 
     final data = jsonDecode(response.body);
 
@@ -389,6 +392,8 @@ Future<void> analizarConsumoApi({
     throw Exception('Error inesperado (${response.statusCode})');
 
   } catch (e) {
+    hideLoadingDialog();
+
     print("ERROR ANALIZAR CONSUMO : $e");
 
     Get.snackbar(
@@ -439,5 +444,43 @@ Future<void> deleteConsumoApi ({
   } catch (e) {
     print("ERROR ANALIZAR CONSUMO : $e");
     rethrow;
+  }
+}
+
+void showLoadingDialog() {
+  Get.dialog(
+    PopScope(
+      canPop: false,
+      child: Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                "Generando análisis con IA",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                "Estamos analizando imágenes y extrayendo datos.",
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+    barrierDismissible: false,
+  );
+}
+
+void hideLoadingDialog() {
+  if (Get.isDialogOpen ?? false) {
+    Get.close(1);
   }
 }

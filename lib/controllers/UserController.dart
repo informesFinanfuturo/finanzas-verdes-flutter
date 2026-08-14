@@ -5,6 +5,7 @@ class UserController extends GetxController{
   final user = {}.obs;
   final tiposProveedor = [].obs;
 
+
   void setUsers (List item){
     users.value = item;
   }
@@ -13,7 +14,7 @@ class UserController extends GetxController{
     user.value = item;
   }
 
-  void setTiposProveedor (List item){
+  void setTiposProveedor (List item) {
     tiposProveedor.value = item;
   }
 

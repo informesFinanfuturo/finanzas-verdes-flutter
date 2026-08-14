@@ -10,4 +10,5 @@ class Adminroutes {
   static const permissions = 'permissionsAdmin';
   static const newPermission = 'newPermissionAdmin';
   static const editPermission = 'editPermissionAdmin';
+  static const homeProveedores = 'homeProveedoresAdmin';
 }
