@@ -225,7 +225,7 @@ class _LeftmenuadminState extends State<Leftmenuadmin> {
 
             subtitle: isCollapsed
                 ? null
-                : Text(controller.User["email"], maxLines: 1),
+                : Text("Administrador", maxLines: 1),
 
             trailing: isCollapsed
                 ? null // 🔥 evita error de ancho

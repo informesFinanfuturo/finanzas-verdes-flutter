@@ -54,130 +54,133 @@ class _EditclientasesorState extends State<Editclientasesor> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            InkWell(
-              onTap: () => controller.backPage(),
-              borderRadius: BorderRadius.circular(15),
-              child: const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: Icon(CupertinoIcons.back),
-              ),
-            ),
-            Text(
-              "Editar cliente",
-              style: GoogleFonts.poppins(fontSize: 18),
-            ),
-            TextButton(
-              onPressed: () async {
-                loading ? null : await _submit();
-              },
-              child: Center(
-                child: loading
-                    ? CircularProgressIndicator(
-                  color: Global.primary,
-                )
-                    : Text(
-                  'Guardar',
-                  style: TextStyle(
-                    color: Global.text,
-                    fontWeight: FontWeight.bold,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              InkWell(
+                onTap: () => controller.backPage(),
+                borderRadius: BorderRadius.circular(15),
+                child: const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Icon(CupertinoIcons.back),
                 ),
               ),
-            )
-          ],
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Global.container,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _input(documentoCtrl, 'Documento', Icons.badge),
-                        const SizedBox(height: 12),
-
-                        _input(nombreCtrl, 'Nombre del cliente', Icons.person),
-                        const SizedBox(height: 12),
-
-                        _input(
-                          emailCtrl,
-                          'Email',
-                          Icons.email,
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 12),
-
-                        _input(
-                          telefonoCtrl,
-                          'Teléfono (opcional)',
-                          Icons.phone,
-                          required: false,
-                          keyboardType: TextInputType.phone,
-                        ),
-                      ],
+              Text(
+                "Editar cliente",
+                style: GoogleFonts.poppins(fontSize: 18),
+              ),
+              TextButton(
+                onPressed: () async {
+                  loading ? null : await _submit();
+                },
+                child: Center(
+                  child: loading
+                      ? CircularProgressIndicator(
+                    color: Global.primary,
+                  )
+                      : Text(
+                    'Guardar',
+                    style: TextStyle(
+                      color: Global.text,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                SizedBox(height: 10,),
-                InkWell(
-                  onTap: confirmDeleteCliente,
-                  borderRadius: BorderRadius.circular(15),
-                  child: Container(
-                    height: 55,
-                    width: double.infinity,
+              )
+            ],
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.red.shade400,
-                          Colors.red.shade700,
+                      color: Global.container,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _input(documentoCtrl, 'Documento', Icons.badge),
+                          const SizedBox(height: 12),
+
+                          _input(nombreCtrl, 'Nombre del cliente', Icons.person),
+                          const SizedBox(height: 12),
+
+                          _input(
+                            emailCtrl,
+                            'Email',
+                            Icons.email,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 12),
+
+                          _input(
+                            telefonoCtrl,
+                            'Teléfono (opcional)',
+                            Icons.phone,
+                            required: false,
+                            keyboardType: TextInputType.phone,
+                          ),
                         ],
                       ),
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.red.withOpacity(0.4),
-                          blurRadius: 8,
-                          offset: Offset(0, 4),
-                        )
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.person_off, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text(
-                          "Desactivar cliente",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
-                ),
-              ],
+                  SizedBox(height: 10,),
+                  InkWell(
+                    onTap: confirmDeleteCliente,
+                    borderRadius: BorderRadius.circular(15),
+                    child: Container(
+                      height: 55,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.red.shade400,
+                            Colors.red.shade700,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          )
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.person_off, color: Colors.white),
+                          SizedBox(width: 8),
+                          Text(
+                            "Desactivar cliente",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

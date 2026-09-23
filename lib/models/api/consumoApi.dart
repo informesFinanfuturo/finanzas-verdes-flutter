@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/controllers/RolController.dart';
 import 'package:finanzas_verdes/controllers/UserController.dart';
 import 'package:finanzas_verdes/main.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -289,38 +292,96 @@ Future<void> uploadImagenConsumoApi({
 Future<void> deleteImagenConsumoApi({
   required int idArchivo,
 }) async {
+  final String baseUrl = Global.baseUrl.endsWith('/')
+      ? Global.baseUrl
+      : '${Global.baseUrl}/';
 
-  final uri = Uri.parse('${Global.baseUrl}consumo/image/$idArchivo');
-  final token = GetStorage().read("token");
+  final uri = Uri.parse(
+    '${baseUrl}consumo/archivo/$idArchivo',
+  );
+
+  final token = GetStorage().read('token');
 
   try {
     final response = await http.delete(
       uri,
       headers: {
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
     );
 
-    if (response.statusCode == 200) {
-      print("Imagen eliminada correctamente ✅");
+    debugPrint('DELETE URL: $uri');
+    debugPrint(
+      'DELETE STATUS: ${response.statusCode}',
+    );
+    debugPrint(
+      'DELETE CONTENT-TYPE: '
+          '${response.headers['content-type']}',
+    );
+    debugPrint(
+      'DELETE RESPONSE: ${response.body}',
+    );
+
+    if (response.statusCode == 200 ||
+        response.statusCode == 204) {
+      debugPrint(
+        'Imagen eliminada correctamente ✅',
+      );
       return;
     }
 
     if (response.statusCode == 401) {
       controller.logOut();
-      return;
+
+      throw Exception(
+        'La sesión expiró. Inicia sesión nuevamente.',
+      );
     }
 
-    if (response.statusCode == 400 || response.statusCode == 404) {
-      final data = jsonDecode(response.body);
-      throw Exception(data['error'] ?? 'Error al eliminar imagen');
+    if (response.statusCode == 403) {
+      throw Exception(
+        'No tienes el permiso "Eliminar archivo consumo".',
+      );
     }
 
-    throw Exception('Error inesperado (${response.statusCode})');
+    final String body = response.body.trim();
 
-  } catch (e) {
-    print("ERROR DELETE IMAGEN: $e");
+    final String contentType =
+        response.headers['content-type'] ?? '';
+
+    if (body.isNotEmpty &&
+        contentType.contains('application/json')) {
+      final dynamic data = jsonDecode(body);
+
+      if (data is Map<String, dynamic>) {
+        throw Exception(
+          data['error'] ??
+              data['message'] ??
+              'No fue posible eliminar la imagen.',
+        );
+      }
+    }
+
+    if (body.startsWith('<!DOCTYPE') ||
+        body.startsWith('<html')) {
+      throw Exception(
+        'El servidor devolvió HTML. '
+            'La ruta no existe o la petición fue redirigida. '
+            'URL consultada: $uri',
+      );
+    }
+
+    throw Exception(
+      'Error inesperado HTTP '
+          '${response.statusCode}.',
+    );
+  } catch (error) {
+    debugPrint(
+      'ERROR DELETE IMAGEN: $error',
+    );
+
     rethrow;
   }
 }
@@ -482,5 +543,90 @@ void showLoadingDialog() {
 void hideLoadingDialog() {
   if (Get.isDialogOpen ?? false) {
     Get.close(1);
+  }
+}
+
+Future<void> uploadDocumentoConsumoApi({
+  required int idConsumo,
+  required int createdBy,
+  required dynamic documento,
+}) async {
+
+  final uri = Uri.parse(
+    '${Global.baseUrl}consumo/documento/upload',
+  );
+
+  final token = GetStorage().read("token");
+
+  try {
+
+    final request = http.MultipartRequest(
+      'POST',
+      uri,
+    );
+
+    request.headers['Authorization'] =
+    'Bearer $token';
+
+    request.fields['id_consumo'] =
+        idConsumo.toString();
+
+    request.fields['created_by'] =
+        createdBy.toString();
+
+    if (kIsWeb) {
+
+      final bytes =
+      await documento.xFile.readAsBytes();
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'documento',
+          bytes,
+          filename: documento.name,
+        ),
+      );
+
+    } else {
+
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'documento',
+          documento.path!,
+        ),
+      );
+
+    }
+
+    final response =
+    await request.send();
+
+    if (response.statusCode == 201) {
+
+      Get.snackbar(
+        "Éxito",
+        "Documento subido correctamente",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
+      return;
+    }
+
+    final body =
+    await response.stream.bytesToString();
+
+    throw Exception(
+      "Error upload (${response.statusCode})\n$body",
+    );
+
+  } catch (e) {
+
+    debugPrint(
+      "ERROR UPLOAD DOCUMENTO: $e",
+    );
+
+    rethrow;
+
   }
 }

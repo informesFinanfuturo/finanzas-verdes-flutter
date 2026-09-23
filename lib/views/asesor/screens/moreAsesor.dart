@@ -22,29 +22,33 @@ class _MoreasesorState extends State<Moreasesor> {
         builder: (context, constraints) {
           final isMobile = constraints.maxWidth < 800;
 
-          return ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 900),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _ProfileCard(),
-                  const SizedBox(height: 30),
+          return Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 900),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _ProfileCard(),
+                    const SizedBox(height: 30),
 
-                  isMobile
-                      ? Column(
-                    children: _actionButtons(),
-                  )
-                      : Row(
-                    children: _actionButtons()
-                        .map((e) => Expanded(child: e))
-                        .toList(),
-                  ),
+                    isMobile
+                        ? Column(
+                      children: _actionButtons(),
+                    )
+                        : Row(
+                      children: _actionButtons()
+                          .map((e) => Expanded(child: e))
+                          .toList(),
+                    ),
 
-                  const SizedBox(height: 30),
+                    const SizedBox(height: 30),
 
-                  _ExtrasSection(),
-                ],
+                    _ExtrasSection(),
+                    SafeArea(child: SizedBox())
+                  ],
+                ),
               ),
             ),
           );

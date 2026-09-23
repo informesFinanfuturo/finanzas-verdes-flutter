@@ -18,56 +18,89 @@ class Dashboardasesor extends StatefulWidget {
   const Dashboardasesor({super.key});
 
   @override
-  State<Dashboardasesor> createState() => _DashboardasesorState();
+  State<Dashboardasesor> createState() =>
+      _DashboardasesorState();
 }
 
-class _DashboardasesorState extends State<Dashboardasesor> {
+class _DashboardasesorState
+    extends State<Dashboardasesor> {
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-    controller.setPage(AsesorRoutes.home);
+
+    controller.setPage(
+      AsesorRoutes.home,
+    );
   }
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+    final width = MediaQuery.sizeOf(context).width;
+    final bool isDesktop = width >= 800;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        controller.backPage();
+        if (!didPop) {
+          controller.backPage();
+        }
       },
-      child: Obx(() {
-        print("REBUILD PAGE => ${controller.Page}");
-        return Scaffold(
+      child: Obx(
+            () => Scaffold(
           backgroundColor: Global.bg,
-          appBar: width >= 800 ? null : AppBarAsesor(),
-          body: Column(
+
+          appBar: isDesktop
+              ? null
+              : AppBarAsesor(),
+
+          // Permite que el contenido pase visualmente
+          // por detrás del menú flotante.
+          extendBody: true,
+
+          body: Row(
             children: [
+              if (isDesktop)
+                Leftmenuasesor(),
+
               Expanded(
-                  child: Row(
-                    children: [
-                      Leftmenuasesor(),
-                      Expanded(
-                        child: Container(
-                          height: double.infinity,
-                          color: Global.bg,
-                          padding: EdgeInsets.only(top: 20, left: 20, right: 20),
-                          child: FadeInDown(
-                            key: ValueKey(controller.Page),
-                            duration: const Duration(milliseconds: 250),
-                            from: 20,
-                            child: controller.Pages[controller.Page],
-                          ),
-                        ),
-                      )
-                    ],
-                  )
+                child: Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  color: Global.bg,
+                  child: FadeInDown(
+                    key: ValueKey(controller.Page),
+                    duration: Duration(milliseconds: 250),
+                    from: 20,
+                    child: controller.Pages[controller.Page],
+                  ),
+                ),
               ),
-              SafeArea(child: Bottommenuasesor())
             ],
           ),
-        );
-      }),
+
+          // Menú flotante solamente en móvil.
+          bottomNavigationBar: isDesktop
+              ? null
+              : _buildFloatingBottomMenu(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingBottomMenu() {
+    return SafeArea(
+      minimum: const EdgeInsets.only(
+        bottom: 15,
+      ),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        heightFactor: 1,
+        child: const Material(
+          color: Colors.transparent,
+          elevation: 0,
+          child: Bottommenuasesor(),
+        ),
+      ),
     );
   }
 }

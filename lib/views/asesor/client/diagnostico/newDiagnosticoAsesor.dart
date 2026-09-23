@@ -25,386 +25,1616 @@ class Newdiagnosticoasesor extends StatefulWidget {
   State<Newdiagnosticoasesor> createState() => _NewdiagnosticoasesorState();
 }
 
-class _NewdiagnosticoasesorState extends State<Newdiagnosticoasesor> {
+class _NewdiagnosticoasesorState
+    extends State<Newdiagnosticoasesor> {
 
   bool loading = false;
 
-  final clientController = Get.find<ClientController>();
+  final ClientController clientController =
+  Get.find<ClientController>();
 
+  Map<String, dynamic> get _mipyme {
+    final preview =
+    clientController.Preview["mipyme"];
+
+    if (preview is Map) {
+      return Map<String, dynamic>.from(
+        preview,
+      );
+    }
+
+    final client =
+    clientController.Client["mipyme"];
+
+    if (client is Map) {
+      return Map<String, dynamic>.from(
+        client,
+      );
+    }
+
+    return <String, dynamic>{};
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return Obx(() {
+      final activos =
+          clientController
+              .activosVisible
+              .value;
 
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            InkWell(
-              onTap: () {
-                controller.backPage();
-              },
-              borderRadius: BorderRadius.circular(15),
-              child: const Padding(
-                padding: EdgeInsets.all(8),
-                child: Icon(CupertinoIcons.back),
-              ),
+      final facturas =
+          clientController
+              .facturasVisible
+              .value;
+
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isMobile =
+              constraints.maxWidth < 720;
+
+          final bool isDesktop =
+              constraints.maxWidth >= 1050;
+
+          return Padding(
+            padding: EdgeInsets.all(
+              isMobile ? 12 : 20,
             ),
-            Text("Realizar diagnóstico", style: GoogleFonts.poppins(fontSize: 18)),
-            MagicWrapper(
-              child: Container(
-                padding: EdgeInsets.symmetric(vertical: 5, horizontal: 5),
-                decoration: Wapp.ButtonDecorationGradient(Global.primary, Global.secondary),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text("Generar diagnóstico", style: TextStyle(color: Colors.white),),
-                    SizedBox(width: 5,),
-                    Icon(Icons.auto_awesome, color: Colors.white,)
-                  ],
-                ),
-              ),
-              onTap: () async {
-                print(clientController.Client);
-                final response = await generarYSyncDiagnosticosApi(
-                  idMipyme: clientController.Preview["mipyme"]["id_mipyme"],
-                  empresa: clientController.Preview["mipyme"],
-                  activos: clientController.activosVisible.value,
-                  facturas: clientController.facturasVisible.value,
-                  diagnosticos: clientController.Preview["diagnosticos"]
-                );
-
-                clientController.setClient(
-                  await getClientDetailApi(
-                    idUsuario: clientController.Client["user"]["id_usuario"],
-                  ),
-                );
-                if(response["diagnostico"] != null) {
-                  controller.backPage();
-                }
-              }
-            ),
-          ],
-        ),
-
-        SizedBox(height: 10),
-
-        Expanded(
-          child: SingleChildScrollView(
             child: Column(
               children: [
-                Text("A continuación se realizará un diagnóstico sobre el estado de la empresa, elimina los datos que no quieras que estén dentro del diagnóstico."),
-
-                SizedBox(height: 10),
-
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    color: Global.container
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Información de la empresa", style: GoogleFonts.poppins(fontSize: 18),),
-                      SizedBox(height: 10,),
-                      _row("Nombre:", clientController.Client["mipyme"]["nombre_mipyme"]),
-                      _row("NIT:", clientController.Client["mipyme"]["nit"]),
-                      _row("Tipo de persona:", clientController.Client["mipyme"]["tipo_persona"]),
-                      _row("Sector:", clientController.Client["mipyme"]["sector_economico"]),
-                      _row("Dirección:", clientController.Client["mipyme"]["direccion"]),
-                      _row("Departamento:", clientController.Client["mipyme"]["departamento"]),
-                      _row("Municipio:", clientController.Client["mipyme"]["municipio"]),
-                      _row("Barrio:", clientController.Client["mipyme"]["barrio"]),
-                      _row("Estrato:", clientController.Client["mipyme"]["estrato"]),
-                      _row("Descripción:", clientController.Client["mipyme"]["descripcion_empresa"]),
-                      _row("Empleados:", clientController.Client["mipyme"]["cantidad_empleados"]?.toString()),
-                      _row("Ingresos:", clientController.Client["mipyme"]["ingresos"]?.toString()),
-                      _row("Egresos:", clientController.Client["mipyme"]["egresos"]?.toString()),
-                      _row("Código CIIU:", clientController.Client["mipyme"]["codigo_ciiu"]),
-                    ],
-                  ),
+                _buildHeader(
+                  isMobile: isMobile,
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 18),
 
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    color: Global.container
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Activos", style: GoogleFonts.poppins(fontSize: 18),),
-                      SizedBox(height: 10,),
-                      ...clientController.activosVisible.value
-                          .asMap()
-                          .entries
-                          .map<Widget>((entry) {
-                        final index = entry.key;
-                        final activo = entry.value;
+                Expanded(
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior
+                        .onDrag,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints:
+                        const BoxConstraints(
+                          maxWidth: 1400,
+                        ),
+                        child: Column(
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                          children: [
+                            _buildIntroduction(),
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Global.absolute,
-                            borderRadius: BorderRadius.circular(12),
+                            const SizedBox(height: 16),
 
-                            border: Border.all(
-                              color: Global.primary.withOpacity(0.2),
-                              width: 1,
+                            _buildSummary(
+                              activosCount:
+                              activos.length,
+                              facturasCount:
+                              facturas.length,
+                              isMobile:
+                              isMobile,
                             ),
 
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.25),
-                                blurRadius: 12,
-                                offset: Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                            const SizedBox(height: 18),
 
-                              // ✅ HEADER CLARO
+                            if (isDesktop)
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment:
+                                CrossAxisAlignment
+                                    .start,
                                 children: [
                                   Expanded(
-                                    child: Text(
-                                      activo["nombre"] ?? "Sin nombre",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                    flex: 4,
+                                    child:
+                                    _buildCompanySection(),
                                   ),
 
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
+                                  const SizedBox(
+                                    width: 18,
+                                  ),
+
+                                  Expanded(
+                                    flex: 6,
+                                    child: Column(
+                                      children: [
+                                        _buildAssetsSection(
+                                          activos,
+                                        ),
+
+                                        const SizedBox(
+                                          height: 18,
+                                        ),
+
+                                        _buildInvoicesSection(
+                                          facturas,
+                                        ),
+                                      ],
                                     ),
-                                    child: IconButton(
-                                      icon: Icon(Icons.cancel, color: Colors.red, size: 20),
-                                      onPressed: () {
-                                        clientController.removeActivo(index);
-                                      },
-                                    ),
-                                  )
+                                  ),
                                 ],
+                              )
+                            else ...[
+                              _buildCompanySection(),
+
+                              const SizedBox(
+                                height: 16,
                               ),
 
-                              SizedBox(height: 5),
+                              _buildAssetsSection(
+                                activos,
+                              ),
 
-                              Text("Tipo: ${activo["tipo"] ?? "Desconocido"}"),
+                              const SizedBox(
+                                height: 16,
+                              ),
 
-                              SizedBox(height: 10),
-
-                              /// ✅ IMÁGENES
-                              SizedBox(
-                                height: 120,
-                                child: activo["imagenes"] == null || activo["imagenes"].isEmpty
-                                    ? Center(
-                                  child: Text(
-                                    "Sin imágenes",
-                                    style: TextStyle(color: Global.textSecondary),
-                                  ),
-                                )
-                                    : ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: activo["imagenes"].length,
-                                  itemBuilder: (context, imgIndex) {
-                                    final img = activo["imagenes"][imgIndex];
-                                    final url = Utils.buildUrl(img);
-
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: Image.network(
-                                          url,
-                                          width: 120,
-                                          height: 120,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
+                              _buildInvoicesSection(
+                                facturas,
                               ),
                             ],
-                          ),
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                ),
 
-                const SizedBox(height: 10),
-
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    color: Global.container
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Facturas", style: GoogleFonts.poppins(fontSize: 18),),
-                      SizedBox(height: 10,),
-                      ...
-                      clientController.facturasVisible
-                          .asMap()
-                          .entries
-                          .map<Widget>((entry) {
-
-                        final index = entry.key;
-                        final consumo = entry.value;
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Global.absolute,
-                            borderRadius: BorderRadius.circular(12),
-
-                            border: Border.all(
-                              color: Global.primary.withOpacity(0.2),
-                              width: 1,
+                            SizedBox(
+                              height:
+                              isMobile ? 100 : 30,
                             ),
-
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.25),
-                                blurRadius: 12,
-                                offset: Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-
-                              /// ✅ HEADER
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      consumo["tipo"] ?? "Sin tipo",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: IconButton(
-                                      icon: Icon(Icons.cancel, color: Colors.red, size: 20),
-                                      onPressed: () {
-                                        clientController.removeFactura(index);
-                                      },
-                                    ),
-                                  )
-                                ],
-                              ),
-
-                              SizedBox(height: 5),
-
-                              Text(
-                                "Consumo: ${consumo["consumo"] ?? "Desconocido"}",
-                                style: TextStyle(color: Global.text.withOpacity(0.7)),
-                              ),
-
-                              SizedBox(height: 10),
-
-                              /// ✅ IMÁGENES (bien contenidas)
-                              SizedBox(
-                                height: 120,
-                                child: consumo["imagenes"] == null ||
-                                    consumo["imagenes"].isEmpty
-                                    ? Center(
-                                  child: Text(
-                                    "Sin imágenes",
-                                    style: TextStyle(color: Global.textSecondary),
-                                  ),
-                                )
-                                    : ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: consumo["imagenes"].length,
-                                  itemBuilder: (context, imgIndex) {
-                                    final img = consumo["imagenes"][imgIndex];
-                                    final url = Utils.buildUrl(img);
-
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: Image.network(
-                                          url,
-                                          width: 110,
-                                          height: 110,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ],
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                SizedBox(height: 10,),
               ],
             ),
+          );
+        },
+      );
+    });
+  }
+
+  Widget _buildHeader({
+    required bool isMobile,
+  }) {
+    final title = Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Preparar diagnóstico',
+          style: GoogleFonts.poppins(
+            fontSize: isMobile ? 19 : 23,
+            fontWeight: FontWeight.w600,
+            color: Global.text,
+          ),
+        ),
+
+        const SizedBox(height: 2),
+
+        Text(
+          'Revisa la información que será analizada por la IA.',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: Global.textSecondary,
           ),
         ),
       ],
-    ));
+    );
+
+    final backButton = Material(
+      color: Global.container,
+      borderRadius:
+      BorderRadius.circular(12),
+      child: InkWell(
+        onTap:
+        loading
+            ? null
+            : controller.backPage,
+        borderRadius:
+        BorderRadius.circular(12),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(
+            Icons.arrow_back_rounded,
+            color: Global.text,
+          ),
+        ),
+      ),
+    );
+
+    if (isMobile) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              backButton,
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: title,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          SizedBox(
+            width: double.infinity,
+            child:
+            _buildGenerateButton(),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        backButton,
+
+        const SizedBox(width: 14),
+
+        Expanded(
+          child: title,
+        ),
+
+        const SizedBox(width: 16),
+
+        _buildGenerateButton(),
+      ],
+    );
   }
 
-  Widget _row(String label, dynamic value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+  Widget _buildGenerateButton() {
+    return ElevatedButton.icon(
+      onPressed:
+      loading
+          ? null
+          : _generateDiagnostic,
+      icon:
+      loading
+          ? const SizedBox(
+        width: 18,
+        height: 18,
+        child:
+        CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Colors.white,
+        ),
+      )
+          : const Icon(
+        Icons.auto_awesome_rounded,
+        size: 19,
+      ),
+      label: Text(
+        loading
+            ? 'Analizando información...'
+            : 'Generar diagnóstico',
+        style: GoogleFonts.poppins(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor:
+        Global.primary,
+        foregroundColor:
+        Colors.white,
+        disabledBackgroundColor:
+        Global.primary.withOpacity(0.55),
+        disabledForegroundColor:
+        Colors.white,
+        elevation: 0,
+        padding:
+        const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 16,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius:
+          BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntroduction() {
+    return Container(
+      width: double.infinity,
+      padding:
+      const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color:
+        Global.primary.withOpacity(
+          controller.isDark.value
+              ? 0.12
+              : 0.06,
+        ),
+        borderRadius:
+        BorderRadius.circular(14),
+        border: Border.all(
+          color:
+          Global.primary.withOpacity(
+            0.16,
+          ),
+        ),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color:
+              Global.primary.withOpacity(
+                0.14,
+              ),
+              borderRadius:
+              BorderRadius.circular(11),
+            ),
+            child: Icon(
+              Icons.tips_and_updates_outlined,
+              color: Global.primary,
+              size: 21,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Información que analizará la IA',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13.5,
+                    fontWeight:
+                    FontWeight.w600,
+                    color: Global.text,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  'Verifica los datos antes de continuar. Puedes excluir activos o facturas que no deban formar parte del diagnóstico.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11.5,
+                    height: 1.5,
+                    color:
+                    Global.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummary({
+    required int activosCount,
+    required int facturasCount,
+    required bool isMobile,
+  }) {
+    final cards = [
+      _SummaryData(
+        title: 'Empresa',
+        value:
+        _displayValue(
+          _mipyme["nombre_mipyme"],
+        ),
+        icon:
+        Icons.business_outlined,
+        color:
+        Global.primary,
+      ),
+      _SummaryData(
+        title: 'Activos incluidos',
+        value:
+        '$activosCount',
+        icon:
+        Icons.inventory_2_outlined,
+        color:
+        Colors.orange,
+      ),
+      _SummaryData(
+        title: 'Facturas incluidas',
+        value:
+        '$facturasCount',
+        icon:
+        Icons.receipt_long_outlined,
+        color:
+        Colors.blue,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 12.0;
+
+        final columns =
+        isMobile ? 1 : 3;
+
+        final itemWidth =
+            (
+                constraints.maxWidth -
+                    (spacing * (columns - 1))
+            ) /
+                columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: cards
+              .map(
+                (item) => SizedBox(
+              width: itemWidth,
+              child:
+              _buildSummaryCard(
+                item,
+              ),
+            ),
+          )
+              .toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryCard(
+      _SummaryData item,
+      ) {
+    return Container(
+      padding:
+      const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Global.container,
+        borderRadius:
+        BorderRadius.circular(14),
+        border: Border.all(
+          color:
+          Global.text.withOpacity(
+            0.07,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color:
+              item.color.withOpacity(
+                0.11,
+              ),
+              borderRadius:
+              BorderRadius.circular(11),
+            ),
+            child: Icon(
+              item.icon,
+              size: 20,
+              color: item.color,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10.5,
+                    color:
+                    Global.textSecondary,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                Text(
+                  item.value,
+                  maxLines: 1,
+                  overflow:
+                  TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight:
+                    FontWeight.w600,
+                    color: Global.text,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompanySection() {
+    final fields = [
+      _InfoData(
+        'Nombre',
+        _mipyme["nombre_mipyme"],
+        Icons.business_outlined,
+      ),
+      _InfoData(
+        'NIT',
+        _mipyme["nit"],
+        Icons.badge_outlined,
+      ),
+      _InfoData(
+        'Tipo de persona',
+        _mipyme["tipo_persona"],
+        Icons.person_outline_rounded,
+      ),
+      _InfoData(
+        'Sector económico',
+        _mipyme["sector_economico"],
+        Icons.category_outlined,
+      ),
+      _InfoData(
+        'Código CIIU',
+        _mipyme["codigo_ciiu"],
+        Icons.account_tree_outlined,
+      ),
+      _InfoData(
+        'Cantidad de empleados',
+        _mipyme["cantidad_empleados"],
+        Icons.groups_outlined,
+      ),
+      _InfoData(
+        'Departamento',
+        _mipyme["departamento"],
+        Icons.map_outlined,
+      ),
+      _InfoData(
+        'Municipio',
+        _mipyme["municipio"],
+        Icons.location_city_outlined,
+      ),
+      _InfoData(
+        'Barrio',
+        _mipyme["barrio"],
+        Icons.place_outlined,
+      ),
+      _InfoData(
+        'Dirección',
+        _mipyme["direccion"],
+        Icons.signpost_outlined,
+      ),
+      _InfoData(
+        'Estrato',
+        _mipyme["estrato"],
+        Icons.layers_outlined,
+      ),
+    ];
+
+    return _SectionCard(
+      title:
+      'Información de la empresa',
+      subtitle:
+      'Datos generales incluidos en el análisis.',
+      icon:
+      Icons.apartment_rounded,
+      iconColor:
+      Global.primary,
+      child: Column(
+        children: [
+          LayoutBuilder(
+            builder: (
+                context,
+                constraints,
+                ) {
+              final columns =
+              constraints.maxWidth >=
+                  650
+                  ? 2
+                  : 1;
+
+              const spacing = 10.0;
+
+              final width =
+                  (
+                      constraints.maxWidth -
+                          spacing *
+                              (columns - 1)
+                  ) /
+                      columns;
+
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: fields
+                    .map(
+                      (field) =>
+                      SizedBox(
+                        width: width,
+                        child:
+                        _buildInfoItem(
+                          field,
+                        ),
+                      ),
+                )
+                    .toList(),
+              );
+            },
+          ),
+
+          const SizedBox(height: 10),
+
+          _buildDescriptionItem(
+            label:
+            'Descripción de la empresa',
+            value:
+            _mipyme[
+            "descripcion_empresa"],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(
+      _InfoData item,
+      ) {
+    return Container(
+      padding:
+      const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color:
+        Global.absolute.withOpacity(
+          controller.isDark.value
+              ? 0.38
+              : 0.65,
+        ),
+        borderRadius:
+        BorderRadius.circular(11),
+        border: Border.all(
+          color:
+          Global.text.withOpacity(
+            0.055,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            item.icon,
+            size: 17,
+            color: Global.primary,
+          ),
+
+          const SizedBox(width: 9),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.label,
+                  style:
+                  GoogleFonts.poppins(
+                    fontSize: 9.5,
+                    fontWeight:
+                    FontWeight.w500,
+                    color:
+                    Global.textSecondary,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                Text(
+                  _displayValue(
+                    item.value,
+                  ),
+                  maxLines: 2,
+                  overflow:
+                  TextOverflow.ellipsis,
+                  style:
+                  GoogleFonts.poppins(
+                    fontSize: 11.5,
+                    fontWeight:
+                    FontWeight.w500,
+                    color: Global.text,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDescriptionItem({
+    required String label,
+    dynamic value,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding:
+      const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color:
+        Global.absolute.withOpacity(
+          controller.isDark.value
+              ? 0.38
+              : 0.65,
+        ),
+        borderRadius:
+        BorderRadius.circular(11),
+        border: Border.all(
+          color:
+          Global.text.withOpacity(
+            0.055,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
           Text(
-            "$label ",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 9.5,
+              fontWeight:
+              FontWeight.w500,
+              color:
+              Global.textSecondary,
+            ),
+          ),
+
+          const SizedBox(height: 5),
+
+          Text(
+            _displayValue(value),
+            style: GoogleFonts.poppins(
+              fontSize: 11.5,
+              height: 1.5,
               color: Global.text,
             ),
           ),
-          Expanded(
-            child: Text(
-              value != null && value.toString().isNotEmpty
-                  ? value.toString()
-                  : "No registrado",
-              style: TextStyle(
-                color: Global.text.withOpacity(0.7),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssetsSection(
+      List activos,
+      ) {
+    return _SectionCard(
+      title: 'Activos',
+      subtitle:
+      '${activos.length} elementos incluidos en el diagnóstico.',
+      icon:
+      Icons.inventory_2_outlined,
+      iconColor:
+      Colors.orange,
+      child:
+      activos.isEmpty
+          ? _buildEmptyState(
+        icon:
+        Icons.inventory_2_outlined,
+        title:
+        'No hay activos incluidos',
+        description:
+        'El diagnóstico se realizará sin información de activos.',
+      )
+          : _buildResponsiveCards(
+        activos.asMap().entries
+            .map(
+              (entry) =>
+              _buildAssetCard(
+                index:
+                entry.key,
+                activo:
+                entry.value,
               ),
+        )
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _buildAssetCard({
+    required int index,
+    required dynamic activo,
+  }) {
+    final nombre =
+    _displayValue(
+      activo["nombre"],
+      fallback: 'Activo sin nombre',
+    );
+
+    final tipo =
+    _displayValue(
+      activo["tipo"],
+    );
+
+    final observaciones =
+    _displayValue(
+      activo["observaciones"],
+      fallback: '',
+    );
+
+    return _SelectionCard(
+      icon:
+      _assetIcon(tipo),
+      accentColor:
+      Colors.orange,
+      title:
+      nombre,
+      badge:
+      tipo,
+      description:
+      observaciones,
+      onRemove: () {
+        clientController
+            .removeActivo(index);
+      },
+    );
+  }
+
+  Widget _buildInvoicesSection(
+      List facturas,
+      ) {
+    return _SectionCard(
+      title: 'Facturas y consumos',
+      subtitle:
+      '${facturas.length} registros incluidos en el diagnóstico.',
+      icon:
+      Icons.receipt_long_outlined,
+      iconColor:
+      Colors.blue,
+      child:
+      facturas.isEmpty
+          ? _buildEmptyState(
+        icon:
+        Icons.receipt_long_outlined,
+        title:
+        'No hay facturas incluidas',
+        description:
+        'El diagnóstico se realizará sin información de consumo histórico.',
+      )
+          : _buildResponsiveCards(
+        facturas.asMap().entries
+            .map(
+              (entry) =>
+              _buildInvoiceCard(
+                index:
+                entry.key,
+                factura:
+                entry.value,
+              ),
+        )
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceCard({
+    required int index,
+    required dynamic factura,
+  }) {
+    final tipo =
+    _displayValue(
+      factura["tipo"] ??
+          factura["tipo_servicio"],
+      fallback: 'Servicio',
+    );
+
+    final consumo =
+    _displayValue(
+      factura["consumo"],
+    );
+
+    final unidad =
+    _displayValue(
+      factura["unidad_medida"],
+      fallback: '',
+    );
+
+    final periodo =
+    _formatPeriod(factura);
+
+    final details = <String>[
+      if (consumo != 'No registrado')
+        'Consumo: $consumo${unidad.isEmpty ? '' : ' $unidad'}',
+      if (periodo.isNotEmpty)
+        'Periodo: $periodo',
+    ].join('  •  ');
+
+    return _SelectionCard(
+      icon:
+      _serviceIcon(tipo),
+      accentColor:
+      Colors.blue,
+      title:
+      tipo,
+      badge:
+      'Factura',
+      description:
+      details,
+      onRemove: () {
+        clientController
+            .removeFactura(index);
+      },
+    );
+  }
+
+  Widget _buildResponsiveCards(
+      List<Widget> cards,
+      ) {
+    return LayoutBuilder(
+      builder: (
+          context,
+          constraints,
+          ) {
+        const spacing = 10.0;
+
+        final columns =
+        constraints.maxWidth >= 720
+            ? 2
+            : 1;
+
+        final width =
+            (
+                constraints.maxWidth -
+                    spacing * (columns - 1)
+            ) /
+                columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: cards
+              .map(
+                (card) => SizedBox(
+              width: width,
+              child: card,
+            ),
+          )
+              .toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding:
+      const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 24,
+      ),
+      decoration: BoxDecoration(
+        color:
+        Global.absolute.withOpacity(
+          controller.isDark.value
+              ? 0.30
+              : 0.55,
+        ),
+        borderRadius:
+        BorderRadius.circular(12),
+        border: Border.all(
+          color:
+          Global.text.withOpacity(
+            0.06,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            size: 30,
+            color:
+            Global.textSecondary,
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            title,
+            textAlign:
+            TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight:
+              FontWeight.w600,
+              color: Global.text,
             ),
           ),
+
+          const SizedBox(height: 4),
+
+          Text(
+            description,
+            textAlign:
+            TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 10.5,
+              height: 1.45,
+              color:
+              Global.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void>
+  _generateDiagnostic() async {
+    if (loading) return;
+
+    final idMipyme =
+    _mipyme["id_mipyme"];
+
+    if (idMipyme == null) {
+      Get.snackbar(
+        'No fue posible continuar',
+        'No se encontró la empresa asociada al diagnóstico.',
+        snackPosition:
+        SnackPosition.BOTTOM,
+      );
+
+      return;
+    }
+
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      final response =
+      await generarYSyncDiagnosticosApi(
+        idMipyme: idMipyme,
+        empresa: _mipyme,
+        activos:
+        clientController
+            .activosVisible
+            .value,
+        facturas:
+        clientController
+            .facturasVisible
+            .value,
+        diagnosticos:
+        clientController
+            .Preview[
+        "diagnosticos"] ??
+            [],
+      );
+
+      final user =
+      clientController.Client["user"];
+
+      final idUsuario =
+      user is Map
+          ? user["id_usuario"]
+          : null;
+
+      if (idUsuario != null) {
+        clientController.setClient(
+          await getClientDetailApi(
+            idUsuario:
+            idUsuario,
+          ),
+        );
+      }
+
+      if (
+      response["diagnostico"] !=
+          null &&
+          mounted
+      ) {
+        controller.backPage();
+      }
+    } catch (error) {
+      Get.snackbar(
+        'No se pudo generar el diagnóstico',
+        'Verifica la conexión e inténtalo nuevamente.',
+        snackPosition:
+        SnackPosition.BOTTOM,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+    }
+  }
+
+  String _displayValue(
+      dynamic value, {
+        String fallback =
+        'No registrado',
+      }) {
+    final text =
+        value?.toString().trim() ??
+            '';
+
+    if (
+    text.isEmpty ||
+        text.toLowerCase() ==
+            'null'
+    ) {
+      return fallback;
+    }
+
+    return text;
+  }
+
+  String _formatPeriod(
+      dynamic factura,
+      ) {
+    final inicio =
+    _displayValue(
+      factura["periodo_inicio"],
+      fallback: '',
+    );
+
+    final fin =
+    _displayValue(
+      factura["periodo_fin"],
+      fallback: '',
+    );
+
+    if (
+    inicio.isEmpty &&
+        fin.isEmpty
+    ) {
+      return '';
+    }
+
+    if (inicio.isEmpty) {
+      return fin;
+    }
+
+    if (fin.isEmpty) {
+      return inicio;
+    }
+
+    return '$inicio – $fin';
+  }
+
+  IconData _assetIcon(
+      String type,
+      ) {
+    final value =
+    type.toLowerCase();
+
+    if (
+    value.contains('nevera') ||
+        value.contains('refrig')
+    ) {
+      return Icons.kitchen_outlined;
+    }
+
+    if (
+    value.contains('horno')
+    ) {
+      return Icons.microwave_outlined;
+    }
+
+    if (
+    value.contains('clima') ||
+        value.contains('aire')
+    ) {
+      return Icons.ac_unit_rounded;
+    }
+
+    if (
+    value.contains('ilum') ||
+        value.contains('bombillo')
+    ) {
+      return Icons.lightbulb_outline;
+    }
+
+    if (
+    value.contains('comput')
+    ) {
+      return Icons.computer_outlined;
+    }
+
+    if (
+    value.contains('motor')
+    ) {
+      return Icons.settings_outlined;
+    }
+
+    return Icons.inventory_2_outlined;
+  }
+
+  IconData _serviceIcon(
+      String type,
+      ) {
+    final value =
+    type.toLowerCase();
+
+    if (
+    value.contains('agua')
+    ) {
+      return Icons.water_drop_outlined;
+    }
+
+    if (
+    value.contains('energ') ||
+        value.contains('luz')
+    ) {
+      return Icons.bolt_outlined;
+    }
+
+    if (
+    value.contains('gas')
+    ) {
+      return Icons.local_fire_department_outlined;
+    }
+
+    return Icons.receipt_long_outlined;
+  }
+}
+
+class _SummaryData {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _SummaryData({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+}
+
+class _InfoData {
+  final String label;
+  final dynamic value;
+  final IconData icon;
+
+  const _InfoData(
+      this.label,
+      this.value,
+      this.icon,
+      );
+}
+
+class _SectionCard
+    extends StatelessWidget {
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color iconColor;
+  final Widget child;
+
+  const _SectionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.iconColor,
+    required this.child,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return Container(
+      width: double.infinity,
+      padding:
+      const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Global.container,
+        borderRadius:
+        BorderRadius.circular(16),
+        border: Border.all(
+          color:
+          Global.text.withOpacity(
+            0.07,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color:
+            Colors.black.withOpacity(
+              controller.isDark.value
+                  ? 0.12
+                  : 0.035,
+            ),
+            blurRadius: 22,
+            offset:
+            const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration:
+                BoxDecoration(
+                  color:
+                  iconColor.withOpacity(
+                    0.11,
+                  ),
+                  borderRadius:
+                  BorderRadius.circular(
+                    11,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: 20,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+                  children: [
+                    Text(
+                      title,
+                      style:
+                      GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight:
+                        FontWeight.w600,
+                        color: Global.text,
+                      ),
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    Text(
+                      subtitle,
+                      style:
+                      GoogleFonts.poppins(
+                        fontSize: 10.5,
+                        color: Global
+                            .textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          Divider(
+            height: 1,
+            color:
+            Global.text.withOpacity(
+              0.07,
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectionCard
+    extends StatelessWidget {
+
+  final IconData icon;
+  final Color accentColor;
+  final String title;
+  final String badge;
+  final String description;
+  final VoidCallback onRemove;
+
+  const _SelectionCard({
+    required this.icon,
+    required this.accentColor,
+    required this.title,
+    required this.badge,
+    required this.description,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return Container(
+      padding:
+      const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color:
+        Global.absolute.withOpacity(
+          controller.isDark.value
+              ? 0.36
+              : 0.64,
+        ),
+        borderRadius:
+        BorderRadius.circular(13),
+        border: Border.all(
+          color:
+          Global.text.withOpacity(
+            0.06,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration:
+                BoxDecoration(
+                  color:
+                  accentColor.withOpacity(
+                    0.11,
+                  ),
+                  borderRadius:
+                  BorderRadius.circular(
+                    10,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  size: 19,
+                  color: accentColor,
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow:
+                      TextOverflow
+                          .ellipsis,
+                      style:
+                      GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight:
+                        FontWeight.w600,
+                        color: Global.text,
+                      ),
+                    ),
+
+                    const SizedBox(height: 5),
+
+                    Container(
+                      padding:
+                      const EdgeInsets
+                          .symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration:
+                      BoxDecoration(
+                        color:
+                        accentColor
+                            .withOpacity(
+                          0.09,
+                        ),
+                        borderRadius:
+                        BorderRadius
+                            .circular(20),
+                      ),
+                      child: Text(
+                        badge,
+                        maxLines: 1,
+                        overflow:
+                        TextOverflow
+                            .ellipsis,
+                        style:
+                        GoogleFonts.poppins(
+                          fontSize: 9,
+                          fontWeight:
+                          FontWeight.w500,
+                          color:
+                          accentColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              Tooltip(
+                message:
+                'Excluir del diagnóstico',
+                child: IconButton(
+                  onPressed:
+                  onRemove,
+                  visualDensity:
+                  VisualDensity.compact,
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                  ),
+                  color:
+                  Colors.redAccent,
+                  style:
+                  IconButton.styleFrom(
+                    backgroundColor:
+                    Colors.redAccent
+                        .withOpacity(
+                      0.08,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          if (
+          description.trim().isNotEmpty
+          ) ...[
+            const SizedBox(height: 10),
+
+            Text(
+              description,
+              maxLines: 3,
+              overflow:
+              TextOverflow.ellipsis,
+              style:
+              GoogleFonts.poppins(
+                fontSize: 10.5,
+                height: 1.45,
+                color:
+                Global.textSecondary,
+              ),
+            ),
+          ],
         ],
       ),
     );

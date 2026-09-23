@@ -216,10 +216,10 @@ class _LeftmenusuperadminState extends State<Leftmenusuperadmin> {
 
             subtitle: isCollapsed
                 ? null
-                : Text(controller.User["email"], maxLines: 1),
+                : Text("Super admin", maxLines: 1),
 
             trailing: isCollapsed
-                ? null // 🔥 evita error de ancho
+                ? null
                 : InkWell(
               onTap: controller.logOut,
               child: const Padding(

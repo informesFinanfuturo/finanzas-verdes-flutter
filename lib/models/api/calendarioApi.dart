@@ -198,3 +198,65 @@ Future<void> editarCalendarioApi({
   }
 
 }
+
+Future<List<dynamic>> getClientsAgendaRangeApi({
+  required DateTime fechaInicio,
+  required DateTime fechaFin,
+}) async {
+
+  final uri = Uri.parse(
+    '${Global.baseUrl}calendario/range',
+  );
+
+  final token =
+  GetStorage().read("token");
+
+  try {
+
+    final response =
+    await http.post(
+
+      uri,
+
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+
+      body: jsonEncode({
+
+        "fecha_inicio":
+        fechaInicio
+            .toIso8601String()
+            .split('T')
+            .first,
+
+        "fecha_fin":
+        fechaFin
+            .toIso8601String()
+            .split('T')
+            .first,
+
+      }),
+
+    );
+
+    if (response.statusCode == 200) {
+
+      final result =
+      jsonDecode(
+        response.body,
+      );
+      return List<dynamic>.from(result["clients"] ?? [],);
+    }
+    if (response.statusCode == 401) {
+      controller.logOut();
+      return [];
+    }
+    final data = jsonDecode(response.body,);
+    throw Exception(data['error'] ?? 'Error al obtener agenda');
+  } catch (e) {
+    print("ERROR OBTENER AGENDA RANGO: $e");
+    rethrow;
+  }
+}

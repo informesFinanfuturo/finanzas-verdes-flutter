@@ -10,6 +10,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main () async {
 
@@ -17,7 +18,16 @@ void main () async {
   await initializeDateFormatting('es');
   Get.put(Generalcontoller());
   runApp(Obx(() => GetMaterialApp(
-
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: const [
+      Locale('es'),
+      Locale('en'),
+    ],
+    locale: const Locale('es'),
     title: "Finanzas verdes",
     debugShowCheckedModeBanner: false,
     theme: ThemeData(

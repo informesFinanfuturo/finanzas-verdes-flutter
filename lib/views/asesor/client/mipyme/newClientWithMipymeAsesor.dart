@@ -15,16 +15,16 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class Editmipymeasesor extends StatefulWidget {
-  const Editmipymeasesor({super.key});
+class Newclientwithmipymeasesor extends StatefulWidget {
+  const Newclientwithmipymeasesor({super.key});
 
   @override
-  State<Editmipymeasesor> createState() =>
-      _EditmipymeasesorState();
+  State<Newclientwithmipymeasesor> createState() =>
+      _NewclientwithmipymeasesorState();
 }
 
-class _EditmipymeasesorState
-    extends State<Editmipymeasesor> {
+class _NewclientwithmipymeasesorState
+    extends State<Newclientwithmipymeasesor> {
   final _formKey = GlobalKey<FormState>();
 
   // ✅ CLIENTE
@@ -59,18 +59,10 @@ class _EditmipymeasesorState
 
   final ClientController clientController = Get.find<ClientController>();
 
-  void markAsChanged() {
-    controller.hasUnsavedChanges.value = true;
-  }
-
   @override
   void dispose() {
-    nombreMipymeCtrl.removeListener(markAsChanged);
-    nitCtrl.removeListener(markAsChanged);
-    direccionCtrl.removeListener(markAsChanged);
-    descripcionCtrl.removeListener(markAsChanged);
-    empleadosCtrl.removeListener(markAsChanged);
-    ciiuCtrl.removeListener(markAsChanged);
+    documentoCtrl.removeListener(_onDocumentoChanged);
+    nitCtrl.removeListener(_onNitChanged);
 
     documentoCtrl.dispose();
     nitCtrl.dispose();
@@ -93,34 +85,8 @@ class _EditmipymeasesorState
   void initState() {
     super.initState();
 
-    final mipyme = Map<String, dynamic>.from(
-      clientController.Client["mipyme"] ?? {},
-    );
-
-    nombreMipymeCtrl.text = mipyme["nombre_mipyme"]?.toString() ?? '';
-    nitCtrl.text = mipyme["nit"]?.toString() ?? '';
-    selectedDepartamento = mipyme["departamento"]?.toString();
-    selectedMunicipio = mipyme["municipio"]?.toString();
-    selectedBarrio = mipyme["barrio"]?.toString();
-    direccionCtrl.text = mipyme["direccion"]?.toString() ?? '';
-    ciiuCtrl.text = mipyme["codigo_ciiu"]?.toString() ?? '';
-    selectedEstrato = mipyme["estrato"] is int
-        ? mipyme["estrato"] as int
-        : int.tryParse(mipyme["estrato"]?.toString() ?? '');
-    selectedTipoEmpresa = mipyme["tipo_empresa"]?.toString();
-    descripcionCtrl.text = mipyme["descripcion_empresa"]?.toString() ?? '';
-    empleadosCtrl.text = mipyme["cantidad_empleados"]?.toString() ?? '';
-    tipoPersona = mipyme["tipo_persona"]?.toString() ?? 'Natural';
-
-    nombreMipymeCtrl.addListener(markAsChanged);
-    nitCtrl.addListener(markAsChanged);
-    direccionCtrl.addListener(markAsChanged);
-    descripcionCtrl.addListener(markAsChanged);
-    empleadosCtrl.addListener(markAsChanged);
-    ciiuCtrl.addListener(markAsChanged);
-
-    controller.hasUnsavedChanges.value = false;
-    _loadCiiuDisplayName();
+    documentoCtrl.addListener(_onDocumentoChanged);
+    nitCtrl.addListener(_onNitChanged);
   }
 
   @override
@@ -158,7 +124,7 @@ class _EditmipymeasesorState
 
                     Expanded(
                       child: Text(
-                        'Editar empresa',
+                        'Crear cliente y mipyme',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
@@ -196,6 +162,8 @@ class _EditmipymeasesorState
                             key: _formKey,
                             child: Column(
                               children: [
+                                _buildClientSection(),
+                                const SizedBox(height: 18),
                                 _buildMipymeSection(),
                                 const SizedBox(height: 24),
                                 _buildSubmitButton(),
@@ -254,48 +222,71 @@ class _EditmipymeasesorState
         ? barrioOtroCtrl.text.trim()
         : selectedBarrio;
 
+    final direccionFinal =
+        "$barrioFinal, $selectedMunicipio, $selectedDepartamento";
+
     setState(() => loading = true);
 
     try {
-      await updateMipymeApi(
-        idMipyme: clientController.Client["mipyme"]["id_mipyme"],
-        updatedBy: controller.User["id_usuario"],
+      await createClientWithMipymeApi(
+        documento: documentoCtrl.text.trim(),
+        nombreUsuario: nombreCtrl.text.trim(),
+        email: emailCtrl.text.trim(),
+        telefono: telefonoCtrl.text.trim().isEmpty
+            ? null
+            : telefonoCtrl.text.trim(),
+
         nombreMipyme: nombreMipymeCtrl.text.trim().isEmpty
             ? null
             : nombreMipymeCtrl.text.trim(),
         nit: nitCtrl.text.trim().isEmpty ? null : nitCtrl.text.trim(),
+
         departamento: selectedDepartamento,
         municipio: selectedMunicipio,
         barrio: barrioFinal,
-        direccion: direccionCtrl.text.trim().isEmpty
-            ? null
-            : direccionCtrl.text.trim(),
-        tipo_persona: tipoPersona,
-        tipo_empresa: selectedTipoEmpresa,
+        direccion: direccionFinal,
+
         descripcionEmpresa: descripcionCtrl.text.trim().isEmpty
             ? null
             : descripcionCtrl.text.trim(),
+
         cantidadEmpleados: empleadosCtrl.text.trim().isEmpty
             ? null
             : int.tryParse(empleadosCtrl.text.trim()),
+
+        // ingresos: ingresosCtrl.text.trim().isEmpty
+        //     ? null
+        //     : double.tryParse(ingresosCtrl.text.trim()),
+        //
+        // egresos: egresosCtrl.text.trim().isEmpty
+        //     ? null
+        //     : double.tryParse(egresosCtrl.text.trim()),
+
         codigoCiiu: ciiuCtrl.text.trim().isEmpty
             ? null
             : ciiuCtrl.text.trim(),
+
         estrato: selectedEstrato,
+        tipo_empresa: selectedTipoEmpresa,
+        tipo_persona: tipoPersona,
+
+        /// EXTRA
+        tipoRelacion: 'propietario',
+        createdBy: controller.User["id_usuario"],
+        clientController: clientController,
       );
 
-      controller.hasUnsavedChanges.value = false;
-      clientController.refreshClient();
       controller.backPage();
+
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        e.toString(),
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      // Get.snackbar(
+      //   'Error',
+      //   e.toString(),
+      //   backgroundColor: Colors.red,
+      //   colorText: Colors.white,
+      // );
     } finally {
-      if (mounted) setState(() => loading = false);
+      setState(() => loading = false);
     }
   }
 
@@ -503,7 +494,7 @@ class _EditmipymeasesorState
           _buildSectionHeader(
             title: 'Datos de la mipyme',
             subtitle:
-            'Actualiza la información general de la empresa',
+            'Completa únicamente la información disponible',
             icon: Icons.business_rounded,
             color: const Color(0xFF2E7D5B),
           ),
@@ -602,7 +593,6 @@ class _EditmipymeasesorState
           setState(() {
             selectedEstrato = value;
           });
-          markAsChanged();
         },
       ),
     );
@@ -634,7 +624,6 @@ class _EditmipymeasesorState
             selectedMunicipio = null;
             selectedBarrio = null;
           });
-          markAsChanged();
         },
       ),
     );
@@ -679,7 +668,6 @@ class _EditmipymeasesorState
             selectedMunicipio = value;
             selectedBarrio = null;
           });
-          markAsChanged();
         },
       ),
     );
@@ -726,7 +714,6 @@ class _EditmipymeasesorState
           setState(() {
             selectedBarrio = value;
           });
-          markAsChanged();
         },
       ),
     );
@@ -745,10 +732,7 @@ class _EditmipymeasesorState
             width: isMobile ? double.infinity : 240,
             height: 52,
             child: ElevatedButton.icon(
-              onPressed: loading ||
-                  !controller.hasUnsavedChanges.value
-                  ? null
-                  : _submit,
+              onPressed: loading ? null : _submit,
               icon: loading
                   ? const SizedBox(
                 width: 19,
@@ -759,12 +743,12 @@ class _EditmipymeasesorState
                 ),
               )
                   : const Icon(
-                Icons.save_outlined,
+                Icons.add_business_rounded,
               ),
               label: Text(
                 loading
-                    ? 'Guardando...'
-                    : 'Guardar cambios',
+                    ? 'Creando...'
+                    : 'Crear cliente',
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Global.primary,
@@ -873,7 +857,6 @@ class _EditmipymeasesorState
           setState(() {
             tipoPersona = value;
           });
-          markAsChanged();
         },
         borderRadius: BorderRadius.circular(9),
         child: AnimatedContainer(
@@ -956,7 +939,6 @@ class _EditmipymeasesorState
           setState(() {
             selectedTipoEmpresa = value;
           });
-          markAsChanged();
         },
       ),
     );
@@ -988,44 +970,6 @@ class _EditmipymeasesorState
         ),
       ),
     );
-  }
-
-  Future<void> _loadCiiuDisplayName() async {
-    final String codigo = ciiuCtrl.text.trim();
-
-    if (codigo.isEmpty) {
-      ciiuDisplayCtrl.clear();
-      return;
-    }
-
-    // Muestra inmediatamente el código mientras se consulta la actividad.
-    ciiuDisplayCtrl.text = codigo;
-
-    try {
-      final data = await searchCiiuApi(query: codigo);
-
-      dynamic match;
-      for (final item in data) {
-        if (item['codigo']?.toString() == codigo) {
-          match = item;
-          break;
-        }
-      }
-
-      if (match == null || !mounted) return;
-
-      final String nombre =
-          match['nombre']?.toString() ??
-              match['descripcion']?.toString() ??
-              match['actividad']?.toString() ??
-              codigo;
-
-      setState(() {
-        ciiuDisplayCtrl.text = nombre;
-      });
-    } catch (_) {
-      // Si la consulta falla, conserva el código existente.
-    }
   }
 
   Future<void> _openCiiuSelector() async {
@@ -1062,8 +1006,14 @@ class _EditmipymeasesorState
           snackPosition: SnackPosition.BOTTOM,
         );
       } finally {
-        // Aquí no se destruye ningún controller.
-        searching.value = false;
+        debounce?.cancel();
+
+        // Espera a que finalice la animación del BottomSheet.
+        await Future<void>.delayed(
+          const Duration(milliseconds: 350),
+        );
+
+        searchCtrl.dispose();
       }
     }
 

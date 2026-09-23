@@ -2,7 +2,7 @@ import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:flutter/material.dart';
 
 class Wapp {
-  static InputDecoration TextFieldDecoration (Color color, bool fill, String hint, IconData icon){
+  static InputDecoration TextFieldDecoration (Color color, bool fill, String hint, IconData? icon){
     return InputDecoration(
       border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
@@ -39,7 +39,7 @@ class Wapp {
               color2
             ]
         ),
-        borderRadius: BorderRadius.circular(5)
+        borderRadius: BorderRadius.circular(25)
     );
   }
 

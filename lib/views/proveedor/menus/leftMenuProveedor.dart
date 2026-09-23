@@ -186,7 +186,7 @@ class _LeftmenuproveedorState extends State<Leftmenuproveedor> {
 
             subtitle: isCollapsed
                 ? null
-                : Text(controller.User["email"], maxLines: 1),
+                : Text("Proveedor", maxLines: 1),
 
             trailing: isCollapsed
                 ? null // ✅ CLAVE: evita el crash

@@ -16,6 +16,7 @@ class AppBarAsesor extends StatelessWidget implements PreferredSizeWidget {
     return PreferredSize(
       preferredSize: preferredSize,
       child: Obx(() => AppBar(
+        scrolledUnderElevation: 0,
         backgroundColor: Global.bg,
         elevation: 0,
         leading: const SizedBox(),

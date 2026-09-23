@@ -121,6 +121,7 @@ Future<void> updateActivoApi({
   String? descripcion,
   String? modelo,
   String? marca,
+  int? cantidad,
   Map<String, dynamic>? datos,
   String? estadoActivo,
 }) async {
@@ -144,6 +145,7 @@ Future<void> updateActivoApi({
         if(estadoActivo != null) 'estado_activo': estadoActivo,
         'modelo': modelo,
         'marca': marca,
+        'cantidad': cantidad,
 
         // ✅ SIEMPRE
         'updated_by': updatedBy,

@@ -167,3 +167,108 @@ void hideLoadingDialog() {
     Get.close(1);
   }
 }
+
+Future<Map> guardarSeleccionActivosDiagnosticoApi({
+  required int idDiagnostico,
+  required List<int> activosSeleccionados,
+  required Map<String, dynamic> resumenSeleccionado,
+}) async {
+
+  final uri = Uri.parse(
+    '${Global.baseUrl}diagnostico/$idDiagnostico/seleccion-activos',
+  );
+
+  final token = GetStorage().read("token");
+
+  try {
+
+    showLoadingDialog();
+
+    final response = await http.patch(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        "activos_seleccionados":
+        activosSeleccionados,
+
+        "resumen_seleccionado":
+        resumenSeleccionado,
+      }),
+    );
+
+    hideLoadingDialog();
+
+    final data =
+    jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+
+      Get.snackbar(
+        "Éxito",
+        data["message"] ??
+            "Selección guardada correctamente",
+        snackPosition:
+        SnackPosition.BOTTOM,
+        backgroundColor:
+        Colors.green,
+        colorText:
+        Colors.white,
+      );
+
+      return data;
+    }
+
+    if (response.statusCode == 401) {
+
+      controller.logOut();
+
+      return {};
+    }
+
+    if (response.statusCode == 404) {
+
+      Get.snackbar(
+        "Error",
+        data["error"] ??
+            "Diagnóstico no encontrado",
+        snackPosition:
+        SnackPosition.BOTTOM,
+        backgroundColor:
+        Colors.red,
+        colorText:
+        Colors.white,
+      );
+
+      return {};
+    }
+
+    throw Exception(
+      data["error"] ??
+          "Error inesperado",
+    );
+
+  } catch (e) {
+
+    hideLoadingDialog();
+
+    print(
+        "ERROR GUARDAR SELECCION ACTIVOS: $e"
+    );
+
+    Get.snackbar(
+      "Error",
+      "No fue posible guardar la selección",
+      snackPosition:
+      SnackPosition.BOTTOM,
+      backgroundColor:
+      Colors.red,
+      colorText:
+      Colors.white,
+    );
+
+    rethrow;
+  }
+}

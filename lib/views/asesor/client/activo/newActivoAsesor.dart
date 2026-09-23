@@ -44,97 +44,100 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(()=> Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return Obx(()=> Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
 
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            InkWell(
-              onTap: () {
-                controller.backPage();
-              },
-              borderRadius: BorderRadius.circular(15),
-              child: const Padding(
-                padding: EdgeInsets.all(8),
-                child: Icon(CupertinoIcons.back),
-              ),
-            ),
-            Text("Registrar Activo",
-                style: GoogleFonts.poppins(fontSize: 18)),
-            TextButton(
-                onPressed: (){
-                  _submit();
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              InkWell(
+                onTap: () {
+                  controller.backPage();
                 },
-                child: Text("Guardar", style: TextStyle(fontSize: 18),)
-            )
-          ],
-        ),
-
-        const SizedBox(height: 10),
-
-        Expanded(
-          child: SingleChildScrollView(
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Global.container,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(15),
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(CupertinoIcons.back),
+                ),
               ),
-              child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
+              Text("Registrar Activo",
+                  style: GoogleFonts.poppins(fontSize: 18)),
+              TextButton(
+                  onPressed: (){
+                    _submit();
+                  },
+                  child: Text("Guardar", style: TextStyle(fontSize: 18),)
+              )
+            ],
+          ),
 
-                      _input(nombreCtrl, "Nombre del activo", Icons.inventory,),
-                      const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Tipo de activo"),
-                          DropdownButtonFormField<String>(
-                            value: tipoSeleccionado,
-                            items: Global.tiposActivo.map((tipo) {
-                              return DropdownMenuItem(
-                                value: tipo,
-                                child: Text(tipo),
-                              );
-                            }).toList(),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Global.container,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
 
-                            onChanged: (value) {
-                              setState(() {
-                                tipoSeleccionado = value!;
-                              });
-                            },
+                        _input(nombreCtrl, "Nombre del activo", Icons.inventory,),
+                        const SizedBox(height: 12),
 
-                            decoration: Wapp.TextFieldDecoration(
-                              Global.primary,
-                              true,
-                              "Tipo",
-                              Icons.category,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Tipo de activo"),
+                            DropdownButtonFormField<String>(
+                              value: tipoSeleccionado,
+                              items: Global.tiposActivo.map((tipo) {
+                                return DropdownMenuItem(
+                                  value: tipo,
+                                  child: Text(tipo),
+                                );
+                              }).toList(),
+
+                              onChanged: (value) {
+                                setState(() {
+                                  tipoSeleccionado = value!;
+                                });
+                              },
+
+                              decoration: Wapp.TextFieldDecoration(
+                                Global.primary,
+                                true,
+                                "Tipo",
+                                Icons.category,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
 
-                      _input(marcaCtrl, "Marca", Icons.branding_watermark),
-                      const SizedBox(height: 12),
+                        _input(marcaCtrl, "Marca", Icons.branding_watermark),
+                        const SizedBox(height: 12),
 
-                      _input(modeloCtrl, "Modelo", Icons.precision_manufacturing),
-                      const SizedBox(height: 12),
+                        _input(modeloCtrl, "Modelo", Icons.precision_manufacturing),
+                        const SizedBox(height: 12),
 
-                      _inputArea(descripcionCtrl, "Ejemplo: frecuencia de uso, reparaciones, daños, modificaciones, ubicación, antigüedad, etc.", Icons.description, "Observaciones del activo", required: false),
-                      const SizedBox(height: 24),
-                    ],
-                  )
+                        _inputArea(descripcionCtrl, "Ejemplo: frecuencia de uso, reparaciones, daños, modificaciones, ubicación, antigüedad, etc.", Icons.description, "Observaciones del activo", required: false),
+                        const SizedBox(height: 24),
+                      ],
+                    )
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ));
   }
 

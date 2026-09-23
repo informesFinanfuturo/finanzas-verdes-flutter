@@ -69,6 +69,7 @@ Future<void> editClientApi({
   String? email,
   String? telefono,
   String? estado,
+  String? estado_observaciones,
   required int updatedBy,
   required ClientController clientController,
 }) async {
@@ -88,6 +89,7 @@ Future<void> editClientApi({
         if (email != null) 'email': email,
         if (telefono != null) 'telefono': telefono,
         if (estado != null) 'estado': estado,
+        if (estado_observaciones != null) 'estado_observaciones': estado_observaciones,
         'updated_by': updatedBy,
       }),
     );
@@ -128,6 +130,45 @@ Future<void> getClientApi({
       uri,
       headers: {
         "Authorization" : "Bearer $token"
+      }
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      clientController.setClients(data["clients"]);
+      return;
+    }
+
+    if (response.statusCode == 400 || response.statusCode == 409) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['error'] ?? 'Error de validación');
+    }
+
+    if (response.statusCode == 401) {
+      controller.logOut();
+    }
+
+    throw Exception('Error inesperado (${response.statusCode})');
+
+  } catch (e) {
+    print("ERROR ESPECIAL AL OBTENER LOS CLIENTES: $e");
+    rethrow;
+  }
+}
+
+Future<void> getClientsByEstadoApi({
+  required ClientController clientController,
+  required String estado
+}) async {
+  final uri = Uri.parse('${Global.baseUrl}client/estado');
+  final token = GetStorage().read("token");
+
+  try {
+    final response = await http.get(
+      uri,
+      headers: {
+        "Authorization" : "Bearer $token",
+        "estado" : estado
       }
     );
 

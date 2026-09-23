@@ -187,7 +187,7 @@ class _LeftmenuclienteState extends State<Leftmenucliente> {
 
             subtitle: isCollapsed
                 ? null
-                : Text(controller.User["email"], maxLines: 1),
+                : Text("Cliente", maxLines: 1),
 
             trailing: isCollapsed
                 ? null // ✅ CLAVE: evita el crash

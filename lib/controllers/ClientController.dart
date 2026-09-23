@@ -1,4 +1,5 @@
 import 'package:finanzas_verdes/models/api/clientApi.dart';
+import 'package:finanzas_verdes/models/api/consumoApi.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
@@ -17,6 +18,7 @@ class ClientController extends GetxController{
   final infoCliente = {}.obs;
   final diagnosticos = [].obs;
   final diagnostico = {}.obs;
+  final selectedClientSection = 0.obs;
 
 
   void setClients (List item){
@@ -37,6 +39,10 @@ class ClientController extends GetxController{
 
   void setConsumo (Map item){
     consumo.value = item;
+  }
+
+  Future<void> refreshConsumo () async {
+    consumo.value = await getConsumoApi(idConsumo: consumo.value["id_consumo"]);
   }
 
   void setPreview(Map<String, dynamic> data) {
@@ -79,6 +85,10 @@ class ClientController extends GetxController{
 
   void setDiagnostico (Map item){
     diagnostico.value = item;
+  }
+
+  void setSelectedClientSection(int index) {
+    selectedClientSection.value = index;
   }
 
   List get Clients => clients.value;

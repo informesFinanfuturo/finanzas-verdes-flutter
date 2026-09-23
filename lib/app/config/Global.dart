@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 class Global {
   static Color get bg => controller.isDark.value ? Color(0xFF232323) : Color(0xFFF2F3F4);
   static Color get primary => controller.isDark.value ? Color(0xFF0074c5) : Color(0xFF30664a);
+  //static Color get primary => controller.isDark.value ? Color(0xFF30664a) : Color(0xFFa9d42d);
   static Color get secondary => controller.isDark.value ? Color(0xFF8a0079) : Color(0xFF8a0079);
   static Color get contrast => controller.isDark.value ? Color(0xFFa9d42d) : Color(0xFFa9d42d);
   static Color get text => controller.isDark.value ? Colors.white : Colors.black;
@@ -225,8 +226,7 @@ class Global {
     "Lavadoras",
     "Lava vajillas",
     "Sanitarios",
-    "Orinales",
     "Grifos",
-    "Otro"
+    "Otro",
   ];
 }
