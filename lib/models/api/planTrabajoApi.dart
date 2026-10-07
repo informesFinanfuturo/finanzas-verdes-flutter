@@ -18,7 +18,6 @@ Future<Map<String, dynamic>?> createPlanTrabajoApi({
   required int createdBy,
   required List<Map<String, dynamic>> tareas,
 }) async {
-
   final uri = Uri.parse('${Global.baseUrl}plantrabajo');
   final token = GetStorage().read("token");
 
@@ -43,7 +42,6 @@ Future<Map<String, dynamic>?> createPlanTrabajoApi({
 
     // ✅ ÉXITO
     if (response.statusCode == 201) {
-
       Get.snackbar(
         "Éxito",
         data["message"] ?? "Plan creado correctamente",
@@ -61,9 +59,19 @@ Future<Map<String, dynamic>?> createPlanTrabajoApi({
       return null;
     }
 
+    if (response.statusCode == 403) {
+      Get.snackbar(
+        "Sin autorización",
+        data["error"] ?? "No tienes acceso a esta empresa",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return null;
+    }
+
     // ✅ ERRORES CONTROLADOS
     if (response.statusCode == 400 || response.statusCode == 404) {
-
       Get.snackbar(
         "Error",
         data["error"] ?? "No se pudo crear el plan",
@@ -76,7 +84,6 @@ Future<Map<String, dynamic>?> createPlanTrabajoApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR CREATE PLAN TRABAJO: $e");
 
@@ -100,7 +107,6 @@ Future<Map<String, dynamic>?> editPlanTrabajoApi({
   required int updatedBy,
   required List tareas,
 }) async {
-
   final uri = Uri.parse('${Global.baseUrl}plantrabajo/$idPlanTrabajo');
   final token = GetStorage().read("token");
 
@@ -133,9 +139,19 @@ Future<Map<String, dynamic>?> editPlanTrabajoApi({
       return null;
     }
 
+    if (response.statusCode == 403) {
+      Get.snackbar(
+        "Sin autorización",
+        data["error"] ?? "No tienes acceso a este plan",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return null;
+    }
+
     // ✅ ERRORES CONTROLADOS
     if (response.statusCode == 400 || response.statusCode == 404) {
-
       Get.snackbar(
         "Error",
         data["error"] ?? "No se pudo editar el plan",
@@ -148,7 +164,6 @@ Future<Map<String, dynamic>?> editPlanTrabajoApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR UPDATE PLAN TRABAJO: $e");
 
@@ -168,7 +183,6 @@ Future<Map> toggleTareaApi({
   required int idTarea,
   required int updatedBy,
 }) async {
-
   final uri = Uri.parse('${Global.baseUrl}plantrabajo/tarea/$idTarea/toggle');
   final token = GetStorage().read("token");
 
@@ -179,9 +193,7 @@ Future<Map> toggleTareaApi({
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({
-        "updated_by": updatedBy,
-      }),
+      body: jsonEncode({"updated_by": updatedBy}),
     );
 
     final data = jsonDecode(response.body);
@@ -210,7 +222,6 @@ Future<Map> toggleTareaApi({
     }
 
     throw Exception("Error inesperado (${response.statusCode})");
-
   } catch (e) {
     print("ERROR TOGGLE TAREA: $e");
 

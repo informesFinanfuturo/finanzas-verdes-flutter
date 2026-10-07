@@ -5,13 +5,17 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-Future<bool?> mostrarModalEditarCalendario (BuildContext context, Map<String, dynamic> cliente,) async {
+Future<bool?> mostrarModalEditarCalendario(
+  BuildContext context,
+  Map<String, dynamic> cliente,
+) async {
+  final tituloController = TextEditingController(text: cliente["titulo"] ?? "");
 
-  final tituloController = TextEditingController(text: cliente["titulo"] ?? "",);
+  final descripcionController = TextEditingController(
+    text: cliente["descripcion"] ?? "",
+  );
 
-  final descripcionController = TextEditingController(text: cliente["descripcion"] ?? "",);
-
-  final fechaOriginal = DateTime.parse(cliente["fecha_hora"],);
+  final fechaOriginal = DateTime.parse(cliente["fecha_hora"]);
 
   DateTime fechaSeleccionada = fechaOriginal;
 
@@ -24,13 +28,13 @@ Future<bool?> mostrarModalEditarCalendario (BuildContext context, Map<String, dy
     context: context,
     builder: (context) {
       return StatefulBuilder(
-        builder: (context, setModalState,) {
+        builder: (context, setModalState) {
           return AlertDialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20,),
+              borderRadius: BorderRadius.circular(20),
             ),
 
-            title: Text("Editar visita",),
+            title: Text("Editar visita"),
 
             content: SizedBox(
               width: 500,
@@ -46,25 +50,27 @@ Future<bool?> mostrarModalEditarCalendario (BuildContext context, Map<String, dy
                       ),
 
                       child: Row(
-
                         children: [
-                          Icon(Icons.person,),
+                          Icon(Icons.person),
                           SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(cliente["nombre_usuario"] ?? "",
-                                  style: const TextStyle(fontWeight: FontWeight.bold,),
+                                Text(
+                                  cliente["nombre_usuario"] ?? "",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                                Text(cliente["nombre_mipyme"] ?? "",),
+                                Text(cliente["nombre_mipyme"] ?? ""),
                               ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: 20,),
+                    SizedBox(height: 20),
                     TextField(
                       controller: tituloController,
                       decoration: InputDecoration(
@@ -73,7 +79,7 @@ Future<bool?> mostrarModalEditarCalendario (BuildContext context, Map<String, dy
                       ),
                     ),
 
-                    SizedBox(height: 15,),
+                    SizedBox(height: 15),
                     TextField(
                       controller: descripcionController,
                       maxLines: 4,
@@ -83,119 +89,78 @@ Future<bool?> mostrarModalEditarCalendario (BuildContext context, Map<String, dy
                       ),
                     ),
 
-                    SizedBox(height: 15,),
+                    SizedBox(height: 15),
 
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            icon: const Icon(Icons.calendar_month,),
+                            icon: const Icon(Icons.calendar_month),
 
-                            label: Text("${fechaSeleccionada.day}/${fechaSeleccionada.month}/${fechaSeleccionada.year}",),
+                            label: Text(
+                              "${fechaSeleccionada.day}/${fechaSeleccionada.month}/${fechaSeleccionada.year}",
+                            ),
 
-                            onPressed:
-                                () async {
-                              final fecha =
-                              await showDatePicker(
+                            onPressed: () async {
+                              final fecha = await showDatePicker(
                                 context: context,
                                 initialDate: fechaSeleccionada,
                                 firstDate: DateTime.now(),
-                                lastDate: DateTime(2100,),
+                                lastDate: DateTime(2100),
                               );
 
                               if (fecha != null) {
                                 setModalState(() {
                                   fechaSeleccionada = fecha;
-                                },
-                                );
+                                });
                               }
-
                             },
-
                           ),
-
                         ),
 
-                        const SizedBox(
-                          width: 10,
-                        ),
+                        const SizedBox(width: 10),
 
                         Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.access_time),
 
-                          child:
-                          OutlinedButton.icon(
+                            label: Text(horaSeleccionada.format(context)),
 
-                            icon: const Icon(
-                              Icons
-                                  .access_time,
-                            ),
+                            onPressed: () async {
+                              final hora = await showTimePicker(
+                                context: context,
 
-                            label: Text(
-                              horaSeleccionada
-                                  .format(
-                                context,
-                              ),
-                            ),
-
-                            onPressed:
-                                () async {
-
-                              final hora =
-                              await showTimePicker(
-
-                                context:
-                                context,
-
-                                initialTime:
-                                horaSeleccionada,
-
+                                initialTime: horaSeleccionada,
                               );
 
                               if (hora != null) {
-                                setModalState(() {horaSeleccionada = hora;},);
+                                setModalState(() {
+                                  horaSeleccionada = hora;
+                                });
                               }
-
                             },
-
                           ),
-
                         ),
-
                       ],
-
                     ),
-
                   ],
-
                 ),
-
               ),
-
             ),
 
             actions: [
-
               TextButton(
                 onPressed: () {
-                  Navigator.pop(
-                    context,
-                    false
-                  );
+                  Navigator.pop(context, false);
                 },
-                child: const Text(
-                  "Cancelar",
-                ),
+                child: const Text("Cancelar"),
               ),
               ElevatedButton.icon(
-                icon: const Icon(
-                  Icons.save,
-                ),
-                label: const Text(
-                  "Guardar cambios",
-                ),
+                icon: const Icon(Icons.save),
+                label: const Text("Guardar cambios"),
                 onPressed: () async {
-                  final fechaHora =
-                  DateTime(
+                  final tituloLimpio = tituloController.text.trim();
+                  final fechaHora = DateTime(
                     fechaSeleccionada.year,
                     fechaSeleccionada.month,
                     fechaSeleccionada.day,
@@ -203,51 +168,52 @@ Future<bool?> mostrarModalEditarCalendario (BuildContext context, Map<String, dy
                     horaSeleccionada.minute,
                   );
 
+                  if (tituloLimpio.isEmpty) {
+                    Get.snackbar(
+                      'Título requerido',
+                      'Debes registrar un título para la visita.',
+                    );
+                    return;
+                  }
+
+                  if (!fechaHora.isAfter(DateTime.now())) {
+                    Get.snackbar(
+                      'Fecha inválida',
+                      'La visita debe quedar programada para una fecha y hora futura.',
+                    );
+                    return;
+                  }
+
                   try {
                     await editarCalendarioApi(
                       id: cliente["id_calendario"],
-                      titulo: tituloController.text,
+                      titulo: tituloLimpio,
                       fechaHora: fechaHora,
                       descripcion: descripcionController.text,
                       direccion: cliente["direccion"] ?? "",
-                      usuarios: [cliente["id_usuario"], controller.User["id_usuario"],],
+                      usuarios: [
+                        cliente["id_usuario"],
+                        controller.User["id_usuario"],
+                      ],
                     );
 
-                    controller.loadRange(controller.firstDate.value, controller.endDate.value);
-
-                    Navigator.pop(
-                      context,
-                      true
+                    controller.loadRange(
+                      controller.firstDate.value,
+                      controller.endDate.value,
                     );
 
-                    Get.snackbar(
-                      "Éxito",
-                      "Visita actualizada correctamente",
-                    );
+                    Navigator.pop(context, true);
 
+                    Get.snackbar("Éxito", "Visita actualizada correctamente");
                   } catch (e) {
-
-                    Get.snackbar(
-                      "Error",
-                      e.toString(),
-                    );
-
+                    Get.snackbar("Error", e.toString());
                   }
-
                 },
-
               ),
-
             ],
-
           );
-
         },
-
       );
-
     },
-
   );
-
 }

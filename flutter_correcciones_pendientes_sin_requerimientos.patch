@@ -1,0 +1,336 @@
+--- a/lib/models/api/prospectoApi.dart
++++ b/lib/models/api/prospectoApi.dart
+@@ -216,7 +216,7 @@
+ 
+       'fecha_hora':
+       fechaHora
+-          .toIso8601String(),
++          .toUtc().toIso8601String(),
+ 
+       'titulo':
+       titulo.trim(),
+--- a/lib/models/api/planTrabajoApi.dart
++++ b/lib/models/api/planTrabajoApi.dart
+@@ -61,6 +61,17 @@
+       return null;
+     }
+ 
++    if (response.statusCode == 403) {
++      Get.snackbar(
++        "Sin autorización",
++        data["error"] ?? "No tienes acceso a esta empresa",
++        snackPosition: SnackPosition.BOTTOM,
++        backgroundColor: Colors.red,
++        colorText: Colors.white,
++      );
++      return null;
++    }
++
+     // ✅ ERRORES CONTROLADOS
+     if (response.statusCode == 400 || response.statusCode == 404) {
+ 
+@@ -133,6 +144,17 @@
+       return null;
+     }
+ 
++    if (response.statusCode == 403) {
++      Get.snackbar(
++        "Sin autorización",
++        data["error"] ?? "No tienes acceso a este plan",
++        snackPosition: SnackPosition.BOTTOM,
++        backgroundColor: Colors.red,
++        colorText: Colors.white,
++      );
++      return null;
++    }
++
+     // ✅ ERRORES CONTROLADOS
+     if (response.statusCode == 400 || response.statusCode == 404) {
+ 
+--- a/lib/models/api/calendarioApi.dart
++++ b/lib/models/api/calendarioApi.dart
+@@ -30,7 +30,7 @@
+       },
+       body: jsonEncode({
+         "titulo": titulo,
+-        "fecha_hora": fechaHora.toIso8601String(),
++        "fecha_hora": fechaHora.toUtc().toIso8601String(),
+         "direccion": direccion,
+         "descripcion": descripcion,
+         "usuarios": usuarios,
+@@ -167,7 +167,7 @@
+       },
+       body: jsonEncode({
+         "titulo": titulo,
+-        "fecha_hora": fechaHora.toIso8601String(),
++        "fecha_hora": fechaHora.toUtc().toIso8601String(),
+         "direccion": direccion,
+         "descripcion": descripcion,
+         "usuarios": usuarios,
+@@ -227,13 +227,13 @@
+ 
+         "fecha_inicio":
+         fechaInicio
+-            .toIso8601String()
++            .toUtc().toIso8601String()
+             .split('T')
+             .first,
+ 
+         "fecha_fin":
+         fechaFin
+-            .toIso8601String()
++            .toUtc().toIso8601String()
+             .split('T')
+             .first,
+ 
+--- a/lib/views/asesor/asesor/createCalendarioAsesor.dart
++++ b/lib/views/asesor/asesor/createCalendarioAsesor.dart
+@@ -276,20 +276,37 @@
+                     ? null
+                     : () async {
+ 
++                  final tituloLimpio = tituloController.text.trim();
++                  final fechaHora = DateTime(
++                    fechaSeleccionada.year,
++                    fechaSeleccionada.month,
++                    fechaSeleccionada.day,
++                    horaSeleccionada.hour,
++                    horaSeleccionada.minute,
++                  );
++
++                  if (tituloLimpio.isEmpty) {
++                    Get.snackbar(
++                      'Título requerido',
++                      'Debes registrar un título para la visita.',
++                    );
++                    return;
++                  }
++
++                  if (!fechaHora.isAfter(DateTime.now())) {
++                    Get.snackbar(
++                      'Fecha inválida',
++                      'La visita debe programarse para una fecha y hora futura.',
++                    );
++                    return;
++                  }
++
+                   setModalState(() {
+                     isLoading = true;
+                   });
+ 
+                   try {
+ 
+-                    final fechaHora = DateTime(
+-                      fechaSeleccionada.year,
+-                      fechaSeleccionada.month,
+-                      fechaSeleccionada.day,
+-                      horaSeleccionada.hour,
+-                      horaSeleccionada.minute,
+-                    );
+-
+                     final bool isProspectLookup =
+                         cliente["id_consulta"] !=
+                             null;
+@@ -304,9 +321,7 @@
+                         "id_consulta"],
+ 
+                         titulo:
+-                        tituloController
+-                            .text
+-                            .trim(),
++                        tituloLimpio,
+ 
+                         fechaHora:
+                         fechaHora,
+@@ -326,7 +341,7 @@
+                     } else {
+ 
+                       await createCalendarioApi(
+-                        titulo: tituloController.text.trim(),
++                        titulo: tituloLimpio,
+                         fechaHora: fechaHora,
+                         descripcion: descripcionController.text.trim(),
+                         direccion: "",
+--- a/lib/views/asesor/asesor/editCalendarioAsesor.dart
++++ b/lib/views/asesor/asesor/editCalendarioAsesor.dart
+@@ -194,6 +194,7 @@
+                   "Guardar cambios",
+                 ),
+                 onPressed: () async {
++                  final tituloLimpio = tituloController.text.trim();
+                   final fechaHora =
+                   DateTime(
+                     fechaSeleccionada.year,
+@@ -203,10 +204,26 @@
+                     horaSeleccionada.minute,
+                   );
+ 
++                  if (tituloLimpio.isEmpty) {
++                    Get.snackbar(
++                      'Título requerido',
++                      'Debes registrar un título para la visita.',
++                    );
++                    return;
++                  }
++
++                  if (!fechaHora.isAfter(DateTime.now())) {
++                    Get.snackbar(
++                      'Fecha inválida',
++                      'La visita debe quedar programada para una fecha y hora futura.',
++                    );
++                    return;
++                  }
++
+                   try {
+                     await editarCalendarioApi(
+                       id: cliente["id_calendario"],
+-                      titulo: tituloController.text,
++                      titulo: tituloLimpio,
+                       fechaHora: fechaHora,
+                       descripcion: descripcionController.text,
+                       direccion: cliente["direccion"] ?? "",
+--- a/lib/views/asesor/client/plan_trabajo/newPlanTrabajoAsesor.dart
++++ b/lib/views/asesor/client/plan_trabajo/newPlanTrabajoAsesor.dart
+@@ -44,6 +44,7 @@
+   void dispose() {
+     nombreCtrl.dispose();
+     descripcionCtrl.dispose();
++    fechaFinCtrl.dispose();
+     super.dispose();
+   }
+ 
+@@ -70,9 +71,7 @@
+               ),
+               Text("Crear plan de trabajo", style: GoogleFonts.poppins(fontSize: 18)),
+               TextButton(
+-                onPressed: () async {
+-                  loading ? null : await _submit();
+-                },
++                onPressed: loading ? null : _submit,
+                 child: Center(
+                   child: loading
+                       ? CircularProgressIndicator(
+@@ -221,22 +220,49 @@
+   }
+ 
+   Future<void> _submit() async {
++    if (loading) return;
+     if (!_formKey.currentState!.validate()) return;
++
++    if (fechaFin == null) {
++      Get.snackbar(
++        'Fecha requerida',
++        'Debes registrar la fecha límite del plan de trabajo.',
++        snackPosition: SnackPosition.BOTTOM,
++      );
++      return;
++    }
++
++    final today = DateTime.now();
++    final todayDate = DateTime(today.year, today.month, today.day);
++    final planDate = DateTime(fechaFin!.year, fechaFin!.month, fechaFin!.day);
++
++    if (planDate.isBefore(todayDate)) {
++      Get.snackbar(
++        'Fecha inválida',
++        'La fecha límite del plan no puede estar en el pasado.',
++        snackPosition: SnackPosition.BOTTOM,
++      );
++      return;
++    }
+ 
+     setState(() => loading = true);
+ 
+     try {
+       final clientController = Get.find<ClientController>();
+ 
+-      await createPlanTrabajoApi(
++      final result = await createPlanTrabajoApi(
+         nombrePlanTrabajo: nombreCtrl.text,
+         descripcion: descripcionCtrl.text,
++        fechaFin: Utils.fechaBackend(fechaFin),
+         idMipyme: clientController.Client["mipyme"]["id_mipyme"],
+         createdBy: controller.User["id_usuario"],
+         tareas: tareas,
+       );
+ 
+-      // ✅ refrescar cliente
++      if (result == null) {
++        return;
++      }
++
+       clientController.setClient(
+         await getClientDetailApi(
+           idUsuario: clientController.Client["user"]["id_usuario"],
+@@ -252,7 +278,9 @@
+         snackPosition: SnackPosition.BOTTOM,
+       );
+     } finally {
+-      setState(() => loading = false);
++      if (mounted) {
++        setState(() => loading = false);
++      }
+     }
+   }
+ }
+--- a/lib/views/asesor/client/plan_trabajo/editPlanTrabajoAsesor.dart
++++ b/lib/views/asesor/client/plan_trabajo/editPlanTrabajoAsesor.dart
+@@ -97,9 +97,7 @@
+               ),
+               Text("Editar plan de trabajo", style: GoogleFonts.poppins(fontSize: 18)),
+               TextButton(
+-                onPressed: () async {
+-                  loading ? null : await _submit();
+-                },
++                onPressed: loading ? null : _submit,
+                 child: Center(
+                   child: loading
+                       ? CircularProgressIndicator(
+@@ -248,14 +246,24 @@
+   }
+ 
+   Future<void> _submit() async {
++    if (loading) return;
+     if (!_formKey.currentState!.validate()) return;
++
++    if (fechaFin == null) {
++      Get.snackbar(
++        'Fecha requerida',
++        'Debes registrar la fecha límite del plan de trabajo.',
++        snackPosition: SnackPosition.BOTTOM,
++      );
++      return;
++    }
+ 
+     setState(() => loading = true);
+ 
+     try {
+       final clientController = Get.find<ClientController>();
+ 
+-      await editPlanTrabajoApi(
++      final result = await editPlanTrabajoApi(
+         idPlanTrabajo:
+         clientController.PlanTrabajo[
+         "id_plan_trabajo"],
+@@ -274,6 +282,10 @@
+ 
+         tareas: tareas,
+       );
++
++      if (result == null) {
++        return;
++      }
+ 
+       await clientController.refreshClient();
+ 
+@@ -286,7 +298,9 @@
+         snackPosition: SnackPosition.BOTTOM,
+       );
+     } finally {
+-      setState(() => loading = false);
++      if (mounted) {
++        setState(() => loading = false);
++      }
+     }
+   }
+ }

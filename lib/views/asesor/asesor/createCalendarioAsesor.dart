@@ -6,242 +6,147 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:finanzas_verdes/models/api/prospectoApi.dart';
 
+Future<bool> mostrarModalCrearCalendario(
+  BuildContext context,
+  Map<String, dynamic> cliente,
+  String titulo,
+) async {
+  final tituloController = TextEditingController(text: titulo);
 
-Future<bool> mostrarModalCrearCalendario(BuildContext context, Map<String, dynamic> cliente, String titulo) async {
+  final descripcionController = TextEditingController();
 
-  final tituloController =
-  TextEditingController(
-    text: titulo,
-  );
+  DateTime fechaSeleccionada = DateTime.now();
 
-  final descripcionController =
-  TextEditingController();
-
-  DateTime fechaSeleccionada =
-  DateTime.now();
-
-  TimeOfDay horaSeleccionada =
-  TimeOfDay.now();
+  TimeOfDay horaSeleccionada = TimeOfDay.now();
 
   bool isLoading = false;
 
   final result = await showDialog(
-
     context: context,
 
     builder: (context) {
-
       return StatefulBuilder(
-
-        builder: (
-            context,
-            setModalState,
-            ) {
-
+        builder: (context, setModalState) {
           return AlertDialog(
-
-            shape:
-            RoundedRectangleBorder(
-              borderRadius:
-              BorderRadius.circular(
-                20,
-              ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
 
-            title: const Text(
-              "Agendar visita",
-            ),
+            title: const Text("Agendar visita"),
 
             content: SizedBox(
-
               width: 450,
 
               child: SingleChildScrollView(
-
                 child: Column(
-
-                  mainAxisSize:
-                  MainAxisSize.min,
+                  mainAxisSize: MainAxisSize.min,
 
                   children: [
-
                     Container(
-                      padding:
-                      const EdgeInsets.all(
-                        12,
-                      ),
-                      decoration:
-                      BoxDecoration(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
                         color: Global.container,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
+                          const Icon(Icons.person),
 
-                          const Icon(
-                            Icons.person,
-                          ),
-
-                          const SizedBox(
-                            width: 10,
-                          ),
+                          const SizedBox(width: 10),
 
                           Expanded(
                             child: Column(
-                              crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-
                                 Text(
-                                  cliente[
-                                  "nombre_usuario"] ??
-                                      "",
-                                  style:
-                                  const TextStyle(
-                                    fontWeight:
-                                    FontWeight
-                                        .bold,
+                                  cliente["nombre_usuario"] ?? "",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
 
-                                Text(
-                                  cliente[
-                                  "nombre_mipyme"] ??
-                                      "",
-                                ),
+                                Text(cliente["nombre_mipyme"] ?? ""),
 
-                                Text(
-                                  cliente[
-                                  "email"] ??
-                                      "",
-                                ),
-
+                                Text(cliente["email"] ?? ""),
                               ],
                             ),
                           ),
-
                         ],
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 20,
-                    ),
+                    const SizedBox(height: 20),
 
                     TextField(
-                      controller:
-                      tituloController,
-                      decoration:
-                      const InputDecoration(
-                        labelText:
-                        "Título",
-                        border:
-                        OutlineInputBorder(),
+                      controller: tituloController,
+                      decoration: const InputDecoration(
+                        labelText: "Título",
+                        border: OutlineInputBorder(),
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 15,
-                    ),
+                    const SizedBox(height: 15),
 
                     TextField(
-                      controller:
-                      descripcionController,
+                      controller: descripcionController,
                       maxLines: 4,
-                      decoration:
-                      const InputDecoration(
-                        labelText:
-                        "Descripción",
-                        border:
-                        OutlineInputBorder(),
+                      decoration: const InputDecoration(
+                        labelText: "Descripción",
+                        border: OutlineInputBorder(),
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 15,
-                    ),
+                    const SizedBox(height: 15),
 
                     Row(
                       children: [
-
                         Expanded(
                           child: OutlinedButton.icon(
-
-                            icon: const Icon(
-                              Icons.calendar_month,
-                            ),
+                            icon: const Icon(Icons.calendar_month),
 
                             label: Text(
                               "${fechaSeleccionada.day}/${fechaSeleccionada.month}/${fechaSeleccionada.year}",
                             ),
 
-                            onPressed:
-                                () async {
-
-                              final fecha =
-                              await showDatePicker(
-                                context:
-                                context,
-                                initialDate:
-                                fechaSeleccionada,
-                                firstDate:
-                                DateTime.now(),
-                                lastDate:
-                                DateTime(
-                                  2100,
-                                ),
+                            onPressed: () async {
+                              final fecha = await showDatePicker(
+                                context: context,
+                                initialDate: fechaSeleccionada,
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime(2100),
                               );
 
                               if (fecha != null) {
-                                setModalState(() {fechaSeleccionada = fecha;},);
+                                setModalState(() {
+                                  fechaSeleccionada = fecha;
+                                });
                               }
                             },
                           ),
                         ),
-                        const SizedBox(
-                          width: 10,
-                        ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: OutlinedButton.icon(
+                            icon: const Icon(Icons.access_time),
 
-                            icon: const Icon(
-                              Icons.access_time,
-                            ),
+                            label: Text(horaSeleccionada.format(context)),
 
-                            label: Text(horaSeleccionada.format(context,),),
-
-                            onPressed:
-                                () async {
-
-                              final hora =
-                              await showTimePicker(
-                                context:
-                                context,
-                                initialTime:
-                                horaSeleccionada,
+                            onPressed: () async {
+                              final hora = await showTimePicker(
+                                context: context,
+                                initialTime: horaSeleccionada,
                               );
 
-                              if (hora !=
-                                  null) {
-
-                                setModalState(
-                                      () {
-                                    horaSeleccionada =
-                                        hora;
-                                  },
-                                );
-
+                              if (hora != null) {
+                                setModalState(() {
+                                  horaSeleccionada = hora;
+                                });
                               }
-
                             },
-
                           ),
                         ),
-
                       ],
                     ),
-
                   ],
                 ),
               ),
@@ -249,115 +154,103 @@ Future<bool> mostrarModalCrearCalendario(BuildContext context, Map<String, dynam
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(
-                    context,
-                    false
-                  );
+                  Navigator.pop(context, false);
                 },
-                child: const Text(
-                  "Cancelar",
-                ),
+                child: const Text("Cancelar"),
               ),
               ElevatedButton.icon(
                 icon: isLoading
                     ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Icon(Icons.event_available),
-                label: Text(
-                  isLoading ? "Creando..." : "Crear cita",
-                ),
+                label: Text(isLoading ? "Creando..." : "Crear cita"),
                 onPressed: isLoading
                     ? null
                     : () async {
+                        final tituloLimpio = tituloController.text.trim();
+                        final fechaHora = DateTime(
+                          fechaSeleccionada.year,
+                          fechaSeleccionada.month,
+                          fechaSeleccionada.day,
+                          horaSeleccionada.hour,
+                          horaSeleccionada.minute,
+                        );
 
-                  setModalState(() {
-                    isLoading = true;
-                  });
+                        if (tituloLimpio.isEmpty) {
+                          Get.snackbar(
+                            'Título requerido',
+                            'Debes registrar un título para la visita.',
+                          );
+                          return;
+                        }
 
-                  try {
+                        if (!fechaHora.isAfter(DateTime.now())) {
+                          Get.snackbar(
+                            'Fecha inválida',
+                            'La visita debe programarse para una fecha y hora futura.',
+                          );
+                          return;
+                        }
 
-                    final fechaHora = DateTime(
-                      fechaSeleccionada.year,
-                      fechaSeleccionada.month,
-                      fechaSeleccionada.day,
-                      horaSeleccionada.hour,
-                      horaSeleccionada.minute,
-                    );
+                        setModalState(() {
+                          isLoading = true;
+                        });
 
-                    final bool isProspectLookup =
-                        cliente["id_consulta"] !=
-                            null;
+                        try {
+                          final bool isProspectLookup =
+                              cliente["id_consulta"] != null;
 
+                          if (isProspectLookup) {
+                            await agendarProspectoApi(
+                              idConsulta: cliente["id_consulta"],
 
-                    if (isProspectLookup) {
+                              titulo: tituloLimpio,
 
-                      await agendarProspectoApi(
+                              fechaHora: fechaHora,
 
-                        idConsulta:
-                        cliente[
-                        "id_consulta"],
+                              descripcion: descripcionController.text.trim(),
 
-                        titulo:
-                        tituloController
-                            .text
-                            .trim(),
+                              direccion: cliente["direccion_negocio"]
+                                  ?.toString(),
+                            );
+                          } else {
+                            await createCalendarioApi(
+                              titulo: tituloLimpio,
+                              fechaHora: fechaHora,
+                              descripcion: descripcionController.text.trim(),
+                              direccion: "",
+                              usuarios: [
+                                cliente["id_usuario"],
+                                controller.User["id_usuario"],
+                              ],
+                            );
+                          }
 
-                        fechaHora:
-                        fechaHora,
+                          controller.loadRange(
+                            controller.firstDate.value,
+                            controller.endDate.value,
+                          );
 
-                        descripcion:
-                        descripcionController
-                            .text
-                            .trim(),
+                          Navigator.pop(context, true);
 
-                        direccion:
-                        cliente[
-                        "direccion_negocio"]
-                            ?.toString(),
+                          Get.snackbar("Éxito", "Cita creada correctamente");
 
-                      );
+                          getClientsAgendaApi();
+                        } catch (e) {
+                          setModalState(() {
+                            isLoading = false;
+                          });
 
-                    } else {
-
-                      await createCalendarioApi(
-                        titulo: tituloController.text.trim(),
-                        fechaHora: fechaHora,
-                        descripcion: descripcionController.text.trim(),
-                        direccion: "",
-                        usuarios: [cliente["id_usuario"], controller.User["id_usuario"],],
-                      );
-                    }
-
-                    controller.loadRange(controller.firstDate.value, controller.endDate.value);
-
-                    Navigator.pop(context, true);
-
-                    Get.snackbar(
-                      "Éxito",
-                      "Cita creada correctamente",
-                    );
-
-                    getClientsAgendaApi();
-
-                  } catch (e) {
-
-                    setModalState(() {
-                      isLoading = false;
-                    });
-
-                    Get.snackbar(
-                      "Error",
-                      e.toString(),
-                    );
-                  }
-                },
-              )
+                          Get.snackbar("Error", e.toString());
+                        }
+                      },
+              ),
             ],
           );
         },

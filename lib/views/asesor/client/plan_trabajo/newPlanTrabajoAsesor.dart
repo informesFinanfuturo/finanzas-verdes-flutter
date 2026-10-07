@@ -26,7 +26,6 @@ class Newplantrabajoasesor extends StatefulWidget {
 }
 
 class _NewplantrabajoasesorState extends State<Newplantrabajoasesor> {
-
   final _formKey = GlobalKey<FormState>();
 
   final nombreCtrl = TextEditingController();
@@ -39,7 +38,6 @@ class _NewplantrabajoasesorState extends State<Newplantrabajoasesor> {
 
   bool loading = false;
 
-
   @override
   void dispose() {
     nombreCtrl.dispose();
@@ -47,212 +45,261 @@ class _NewplantrabajoasesorState extends State<Newplantrabajoasesor> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
-    return Obx(() => SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-      
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              InkWell(
-                onTap: () {
-                  controller.backPage();
-                },
-                borderRadius: BorderRadius.circular(15),
-                child: const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Icon(CupertinoIcons.back),
-                ),
-              ),
-              Text("Crear plan de trabajo", style: GoogleFonts.poppins(fontSize: 18)),
-              TextButton(
-                onPressed: () async {
-                  loading ? null : await _submit();
-                },
-                child: Center(
-                  child: loading
-                      ? CircularProgressIndicator(
-                    color: Global.primary,
-                  )
-                      : Text(
-                    'Guardar',
-                    style: TextStyle(
-                      color: Global.text,
-                      fontWeight: FontWeight.bold,
-                    ),
+    return Obx(
+      () => SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                InkWell(
+                  onTap: () {
+                    controller.backPage();
+                  },
+                  borderRadius: BorderRadius.circular(15),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(CupertinoIcons.back),
                   ),
                 ),
-              ),
-            ],
-          ),
-      
-          const SizedBox(height: 10),
-      
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Global.container,
-              borderRadius: BorderRadius.circular(20),
+                Text(
+                  "Crear plan de trabajo",
+                  style: GoogleFonts.poppins(fontSize: 18),
+                ),
+                TextButton(
+                  onPressed: loading
+                      ? null
+                      : () async {
+                          await _submit();
+                        },
+                  child: Center(
+                    child: loading
+                        ? CircularProgressIndicator(color: Global.primary)
+                        : Text(
+                            'Guardar',
+                            style: TextStyle(
+                              color: Global.text,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
             ),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
 
-                  Wapp.input(nombreCtrl, "Nombre del plan", Icons.assignment),
-                  const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-                  Wapp.inputArea(
-                    descripcionCtrl,
-                    "Descripción",
-                    Icons.description,
-                    required: false,
-                  ),
-
-                  SizedBox(height: 10,),
-                  Wapp.dateField(
-                    context: context,
-                    controller: fechaFinCtrl,
-                    label: "Fecha límite",
-                    initialDate: fechaFin,
-                    onChanged: (date) {
-                      fechaFin = date;
-                    },
-                  ),
-                ],
-              ),
-            )
-          ),
-          SizedBox(height: 10,),
-          InkWell(
-            onTap: () async {
-              final tarea = await openAddTareaModal();
-
-              if (tarea != null) {
-                setState(() {
-                  tareas.add(tarea);
-                });
-              }
-            },
-            child: Container(
-              padding: EdgeInsets.all(10),
+            Container(
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                border: Border.all(color: Global.primary),
-                borderRadius: BorderRadius.circular(10),
+                color: Global.container,
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.add),
-                  SizedBox(width: 5),
-                  Text("Agregar tarea"),
-                ],
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    Wapp.input(nombreCtrl, "Nombre del plan", Icons.assignment),
+                    const SizedBox(height: 12),
+
+                    Wapp.inputArea(
+                      descripcionCtrl,
+                      "Descripción",
+                      Icons.description,
+                      required: false,
+                    ),
+
+                    SizedBox(height: 10),
+                    Wapp.dateField(
+                      context: context,
+                      controller: fechaFinCtrl,
+                      label: "Fecha límite",
+                      initialDate: fechaFin,
+                      onChanged: (date) {
+                        fechaFin = date;
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          SizedBox(height: 10,),
-          Column(
-            children: tareas.map((t) {
-              return Container(
-                margin: EdgeInsets.symmetric(vertical: 5),
+            SizedBox(height: 10),
+            InkWell(
+              onTap: () async {
+                final tarea = await openAddTareaModal();
+
+                if (tarea != null) {
+                  setState(() {
+                    tareas.add(tarea);
+                  });
+                }
+              },
+              child: Container(
                 padding: EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Global.container,
+                  border: Border.all(color: Global.primary),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(t["nombre_tarea"], style: TextStyle(fontWeight: FontWeight.bold)),
-                          if (t["descripcion"] != null)
-                            Text(t["descripcion"]),
-                          if (t["fecha_fin"] != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Row(
-                                children: [
-
-                                  const Icon(
-                                    Icons.calendar_month,
-                                    size: 14,
-                                    color: Colors.orange,
-                                  ),
-
-                                  const SizedBox(width: 4),
-
-                                  Text(
-                                    Utils.formatFechaBonita(
-                                      t["fecha_fin"],
-                                    ),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Global.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        setState(() {
-                          tareas.remove(t);
-                        });
-                      },
-                    )
+                    Icon(Icons.add),
+                    SizedBox(width: 5),
+                    Text("Agregar tarea"),
                   ],
                 ),
-              );
-            }).toList(),
-          )
-        ],
+              ),
+            ),
+            SizedBox(height: 10),
+            Column(
+              children: tareas.map((t) {
+                return Container(
+                  margin: EdgeInsets.symmetric(vertical: 5),
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Global.container,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t["nombre_tarea"],
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            if (t["descripcion"] != null)
+                              Text(t["descripcion"]),
+                            if (t["fecha_fin"] != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_month,
+                                      size: 14,
+                                      color: Colors.orange,
+                                    ),
+
+                                    const SizedBox(width: 4),
+
+                                    Text(
+                                      Utils.formatFechaBonita(t["fecha_fin"]),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Global.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            tareas.remove(t);
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Evita doble envío.
+    if (loading) return;
 
-    setState(() => loading = true);
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // La fecha límite es obligatoria.
+    if (fechaFin == null) {
+      Get.snackbar(
+        'Fecha requerida',
+        'Debes registrar la fecha límite del plan de trabajo.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    // Comparamos únicamente fecha, sin hora.
+    final now = DateTime.now();
+
+    final today = DateTime(now.year, now.month, now.day);
+
+    final selectedDate = DateTime(
+      fechaFin!.year,
+      fechaFin!.month,
+      fechaFin!.day,
+    );
+
+    if (selectedDate.isBefore(today)) {
+      Get.snackbar(
+        'Fecha inválida',
+        'La fecha límite del plan no puede estar en el pasado.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    setState(() {
+      loading = true;
+    });
 
     try {
       final clientController = Get.find<ClientController>();
 
-      await createPlanTrabajoApi(
-        nombrePlanTrabajo: nombreCtrl.text,
-        descripcion: descripcionCtrl.text,
+      final result = await createPlanTrabajoApi(
+        nombrePlanTrabajo: nombreCtrl.text.trim(),
+        descripcion: descripcionCtrl.text.trim(),
+        fechaFin: Utils.fechaBackend(fechaFin!),
         idMipyme: clientController.Client["mipyme"]["id_mipyme"],
         createdBy: controller.User["id_usuario"],
         tareas: tareas,
       );
 
-      // ✅ refrescar cliente
-      clientController.setClient(
-        await getClientDetailApi(
-          idUsuario: clientController.Client["user"]["id_usuario"],
-        ),
+      // El API devuelve null en errores controlados.
+      if (result == null) {
+        return;
+      }
+
+      // Refrescar información del cliente solo si el plan
+      // realmente fue creado.
+      final clientDetail = await getClientDetailApi(
+        idUsuario: clientController.Client["user"]["id_usuario"],
       );
+
+      clientController.setClient(clientDetail);
+
+      if (!mounted) {
+        return;
+      }
 
       controller.backPage();
-
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM);
     } finally {
-      setState(() => loading = false);
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
     }
   }
 }
