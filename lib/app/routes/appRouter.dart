@@ -4,6 +4,7 @@ import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/views/admin/dashBoardAdmin.dart';
 import 'package:finanzas_verdes/views/asesor/dashBoardAsesor.dart';
 import 'package:finanzas_verdes/views/cliente/dashBoardCliente.dart';
+import 'package:finanzas_verdes/views/login/ChangeRequiredPassword.dart';
 import 'package:finanzas_verdes/views/login/Login.dart';
 import 'package:finanzas_verdes/views/proveedor/dashBoardProveedor.dart';
 import 'package:finanzas_verdes/views/superadmin/dashBoardSuperAdmin.dart';
@@ -38,6 +39,11 @@ class AppPages {
     GetPage(
       name: Routes.dashboardSuperAdmin,
       page: () => const Dashboardsuperadmin(),
+    ),
+    GetPage(
+      name: Routes.changeRequiredPassword,
+      page: () =>
+      const ChangeRequiredPassword(),
     ),
   ];
 }

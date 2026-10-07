@@ -5,7 +5,7 @@ import 'package:finanzas_verdes/models/api/calendarioApi.dart';
 import 'package:finanzas_verdes/models/api/clientApi.dart';
 import 'package:finanzas_verdes/views/asesor/asesor/agendaCalendarAsesor.dart';
 import 'package:finanzas_verdes/views/asesor/asesor/clienteAgendaCard.dart';
-import 'package:finanzas_verdes/views/asesor/asesor/clientesTableAsesor.dart';
+import 'package:finanzas_verdes/views/asesor/asesor/clienteExternoLookupAsesor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -29,13 +29,7 @@ class _HomeasesorState extends State<Homeasesor> {
   @override
   void initState() {
     super.initState();
-
     getClientsAgendaApi();
-
-    getClientsByEstadoApi(
-      clientController: clientController,
-      estado: "nuevo",
-    );
   }
 
   @override
@@ -144,7 +138,7 @@ class _HomeasesorState extends State<Homeasesor> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Agenda",
+          "Gestión de clientes",
           style: GoogleFonts.poppins(
             fontSize: 25,
             fontWeight: FontWeight.w600,
@@ -155,7 +149,7 @@ class _HomeasesorState extends State<Homeasesor> {
         const SizedBox(height: 3),
 
         Text(
-          "Organiza las visitas y seguimientos de tus clientes.",
+          "Consulta clientes corporativos, evalúa oportunidades y administra tus visitas.",
           style: GoogleFonts.poppins(
             fontSize: 13,
             color: Global.textSecondary,
@@ -173,7 +167,7 @@ class _HomeasesorState extends State<Homeasesor> {
         size: 20,
       ),
       label: Text(
-        "Programar visita",
+        "Consultar cliente",
         style: GoogleFonts.poppins(
           fontSize: 13,
           fontWeight: FontWeight.w600,
@@ -489,56 +483,119 @@ class _HomeasesorState extends State<Homeasesor> {
   }
 
   Widget _buildClientsSection() {
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+
+      crossAxisAlignment:
+      CrossAxisAlignment
+          .start,
+
       children: [
+
         Row(
+
           children: [
+
             Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: Global.primary.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(11),
+
+              width:
+              38,
+
+              height:
+              38,
+
+              decoration:
+              BoxDecoration(
+
+                color:
+                Global.primary
+                    .withOpacity(
+                  0.10,
+                ),
+
+                borderRadius:
+                BorderRadius.circular(
+                  11,
+                ),
+
               ),
-              child: Icon(
-                Icons.groups_rounded,
-                size: 20,
-                color: Global.primary,
+
+              child:
+              Icon(
+
+                Icons
+                    .person_search_rounded,
+
+                size:
+                20,
+
+                color:
+                Global.primary,
+
               ),
+
             ),
 
-            const SizedBox(width: 11),
+            const SizedBox(
+              width:
+              11,
+            ),
 
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+
+              child:
+              Column(
+
+                crossAxisAlignment:
+                CrossAxisAlignment
+                    .start,
+
                 children: [
+
                   Text(
-                    "Clientes",
-                    style: GoogleFonts.poppins(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      color: Global.text,
+                    "Evaluar cliente",
+                    style:
+                    GoogleFonts.poppins(
+                      fontSize:
+                      17,
+                      fontWeight:
+                      FontWeight.w600,
+                      color:
+                      Global.text,
                     ),
                   ),
+
                   Text(
-                    "Selecciona un cliente para programar una visita.",
-                    style: GoogleFonts.poppins(
-                      fontSize: 11.5,
-                      color: Global.textSecondary,
+                    "Consulta al cliente por documento antes de programar una visita.",
+                    style:
+                    GoogleFonts.poppins(
+                      fontSize:
+                      11.5,
+                      color:
+                      Global.textSecondary,
                     ),
                   ),
+
                 ],
+
               ),
+
             ),
+
           ],
+
         ),
 
-        const SizedBox(height: 14),
+        const SizedBox(
+          height:
+          14,
+        ),
 
-        const ClientesTable(),
+        const ClienteExternoLookupAsesor(),
+
       ],
+
     );
+
   }
 }

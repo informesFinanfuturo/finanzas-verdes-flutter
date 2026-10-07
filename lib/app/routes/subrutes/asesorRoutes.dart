@@ -17,5 +17,4 @@ class AsesorRoutes {
   static const newPlanTrabajo = 'newPlanTrabajoAsesor';
   static const editPlanTrabajo = 'editPlanTrabajoAsesor';
   static const viewPlanTrabajo = 'viewPlanTrabajoAsesor';
-  static const newRequerimiento = 'newRequerimientoAsesor';
 }

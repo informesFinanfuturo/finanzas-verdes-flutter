@@ -17,6 +17,7 @@ class AppBarCliente extends StatelessWidget implements PreferredSizeWidget {
       preferredSize: preferredSize,
       child: Obx(() => AppBar(
         backgroundColor: Global.bg,
+        scrolledUnderElevation: 0,
         elevation: 0,
         leading: const SizedBox(),
         leadingWidth: 0,

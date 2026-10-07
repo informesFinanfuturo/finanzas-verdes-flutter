@@ -7,26 +7,20 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class Bottommenuasesor extends StatefulWidget {
-  const Bottommenuasesor({
-    super.key,
-  });
+  const Bottommenuasesor({super.key});
 
   @override
-  State<Bottommenuasesor> createState() =>
-      _BottommenuasesorState();
+  State<Bottommenuasesor> createState() => _BottommenuasesorState();
 }
 
-class _BottommenuasesorState
-    extends State<Bottommenuasesor> {
+class _BottommenuasesorState extends State<Bottommenuasesor> {
   final List<_BottomMenuItem> modules = [
     _BottomMenuItem(
       name: 'Inicio',
       icon: Icons.home_outlined,
       selectedIcon: Icons.home_rounded,
       route: AsesorRoutes.home,
-      inPages: [
-        AsesorRoutes.home,
-      ],
+      inPages: [AsesorRoutes.home],
     ),
     _BottomMenuItem(
       name: 'Clientes',
@@ -50,7 +44,6 @@ class _BottommenuasesorState
         AsesorRoutes.newPlanTrabajo,
         AsesorRoutes.editPlanTrabajo,
         AsesorRoutes.viewPlanTrabajo,
-        AsesorRoutes.newRequerimiento,
       ],
     ),
     _BottomMenuItem(
@@ -58,16 +51,13 @@ class _BottommenuasesorState
       icon: Icons.menu_rounded,
       selectedIcon: Icons.menu_rounded,
       route: AsesorRoutes.more,
-      inPages: [
-        AsesorRoutes.more,
-      ],
+      inPages: [AsesorRoutes.more],
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final bool isDesktop =
-        MediaQuery.sizeOf(context).width >= 800;
+    final bool isDesktop = MediaQuery.sizeOf(context).width >= 800;
 
     if (isDesktop) {
       return const SizedBox.shrink();
@@ -85,14 +75,11 @@ class _BottommenuasesorState
 
   Widget _buildMenuOptions(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: modules.map((module) {
-          final bool isSelected =
-          module.inPages.contains(controller.Page);
+          final bool isSelected = module.inPages.contains(controller.Page);
 
           return SizedBox(
             width: 58,
@@ -100,10 +87,8 @@ class _BottommenuasesorState
             child: Center(
               child: Tooltip(
                 message: module.name,
-                triggerMode:
-                TooltipTriggerMode.longPress,
-                waitDuration:
-                const Duration(milliseconds: 400),
+                triggerMode: TooltipTriggerMode.longPress,
+                waitDuration: const Duration(milliseconds: 400),
                 child: Semantics(
                   button: true,
                   label: module.name,
@@ -113,16 +98,12 @@ class _BottommenuasesorState
                     child: InkWell(
                       onTap: () {
                         if (!isSelected) {
-                          controller.setPage(
-                            module.route,
-                          );
+                          controller.setPage(module.route);
                         }
                       },
                       customBorder: const CircleBorder(),
                       child: AnimatedContainer(
-                        duration: const Duration(
-                          milliseconds: 200,
-                        ),
+                        duration: const Duration(milliseconds: 200),
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
@@ -130,28 +111,27 @@ class _BottommenuasesorState
 
                           // Selección más visible en claro.
                           color: isSelected
-                              ? isDark ? Global.text.withOpacity(0.22) : Global.primary.withOpacity(0.22)
+                              ? isDark
+                                    ? Global.text.withOpacity(0.22)
+                                    : Global.primary.withOpacity(0.22)
                               : Colors.transparent,
 
                           border: isSelected && !isDark
                               ? Border.all(
-                            color: Global.primary
-                                .withOpacity(0.28),
-                          )
+                                  color: Global.primary.withOpacity(0.28),
+                                )
                               : null,
                         ),
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
                             Icon(
-                              isSelected
-                                  ? module.selectedIcon
-                                  : module.icon,
+                              isSelected ? module.selectedIcon : module.icon,
                               size: isSelected ? 27 : 25,
-                              color: isSelected ?
-                                  isDark ?
-                                  Global.text :
-                                  Global.primary
+                              color: isSelected
+                                  ? isDark
+                                        ? Global.text
+                                        : Global.primary
                                   : isDark
                                   ? Global.textSecondary
                                   : const Color(0xFF4B555A),
@@ -164,7 +144,9 @@ class _BottommenuasesorState
                                   width: 4,
                                   height: 4,
                                   decoration: BoxDecoration(
-                                    color: isDark ? Global.text : Global.primary,
+                                    color: isDark
+                                        ? Global.text
+                                        : Global.primary,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -183,10 +165,7 @@ class _BottommenuasesorState
     );
   }
 
-  Widget _buildMenuSurface({
-    required bool isDark,
-    required Widget child,
-  }) {
+  Widget _buildMenuSurface({required bool isDark, required Widget child}) {
     return Container(
       height: 60,
       decoration: BoxDecoration(
@@ -223,30 +202,25 @@ class _BottommenuasesorState
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius:
-                    BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(22),
                     gradient: isDark
                         ? LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white.withOpacity(0.11),
-                        Global.container
-                            .withOpacity(0.68),
-                      ],
-                    )
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white.withOpacity(0.11),
+                              Global.container.withOpacity(0.68),
+                            ],
+                          )
                         : LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFFF9FFFB)
-                            .withOpacity(0.86),
-                        const Color(0xFFE5F4EA)
-                            .withOpacity(0.78),
-                        const Color(0xFFF3FAF5)
-                            .withOpacity(0.72),
-                      ],
-                    ),
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFFF9FFFB).withOpacity(0.86),
+                              const Color(0xFFE5F4EA).withOpacity(0.78),
+                              const Color(0xFFF3FAF5).withOpacity(0.72),
+                            ],
+                          ),
                     border: Border.all(
                       color: isDark
                           ? Colors.white.withOpacity(0.16)
@@ -306,6 +280,7 @@ class _BottommenuasesorState
     );
   }
 }
+
 class _BottomMenuItem {
   final String name;
   final IconData icon;

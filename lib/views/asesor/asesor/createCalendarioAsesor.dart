@@ -4,6 +4,7 @@ import 'package:finanzas_verdes/models/api/calendarioApi.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:finanzas_verdes/models/api/prospectoApi.dart';
 
 
 Future<bool> mostrarModalCrearCalendario(BuildContext context, Map<String, dynamic> cliente, String titulo) async {
@@ -289,16 +290,49 @@ Future<bool> mostrarModalCrearCalendario(BuildContext context, Map<String, dynam
                       horaSeleccionada.minute,
                     );
 
-                    await createCalendarioApi(
-                      titulo: tituloController.text,
-                      fechaHora: fechaHora,
-                      descripcion: descripcionController.text,
-                      direccion: "",
-                      usuarios: [
-                        cliente["id_usuario"],
-                        controller.User["id_usuario"],
-                      ],
-                    );
+                    final bool isProspectLookup =
+                        cliente["id_consulta"] !=
+                            null;
+
+
+                    if (isProspectLookup) {
+
+                      await agendarProspectoApi(
+
+                        idConsulta:
+                        cliente[
+                        "id_consulta"],
+
+                        titulo:
+                        tituloController
+                            .text
+                            .trim(),
+
+                        fechaHora:
+                        fechaHora,
+
+                        descripcion:
+                        descripcionController
+                            .text
+                            .trim(),
+
+                        direccion:
+                        cliente[
+                        "direccion_negocio"]
+                            ?.toString(),
+
+                      );
+
+                    } else {
+
+                      await createCalendarioApi(
+                        titulo: tituloController.text.trim(),
+                        fechaHora: fechaHora,
+                        descripcion: descripcionController.text.trim(),
+                        direccion: "",
+                        usuarios: [cliente["id_usuario"], controller.User["id_usuario"],],
+                      );
+                    }
 
                     controller.loadRange(controller.firstDate.value, controller.endDate.value);
 

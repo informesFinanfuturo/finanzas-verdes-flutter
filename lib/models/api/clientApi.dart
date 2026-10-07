@@ -476,43 +476,126 @@ Future<void> getConsumosByUsuarioApi({
   }
 }
 
-Future<void> getDiagnosticosByUsuario ({
-  required ClientController clientController
-}) async {
+Future<void> getDiagnosticosByUsuario({required ClientController clientController,}) async {
+  final uri =
+  Uri.parse(
+    '${Global.baseUrl}diagnostico',
+  );
 
-  final uri = Uri.parse('${Global.baseUrl}diagnostico');
-  final token = GetStorage().read("token");
+  final token =
+  GetStorage().read(
+    "token",
+  );
 
   try {
-    final response = await http.get(
+    final response =
+    await http.get(
       uri,
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
+        'Content-Type':
+        'application/json',
+
+        'Authorization':
+        'Bearer $token',
       },
     );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+    Map<String, dynamic> data =
+    {};
 
-      clientController.setDiagnosticos(data["diagnosticos"]);
+    if (response.body.isNotEmpty) {
+      final decoded =
+      jsonDecode(
+        response.body,
+      );
+
+      if (
+      decoded is Map
+      ) {
+        data =
+        Map<String, dynamic>.from(
+          decoded,
+        );
+      }
+    }
+
+    if (response.statusCode == 200) {
+      final diagnosticosRaw =
+      data["diagnosticos"];
+
+      final diagnosticos =
+      diagnosticosRaw is List
+          ? List<dynamic>.from(
+        diagnosticosRaw,
+      )
+          : <dynamic>[];
+
+      clientController.setDiagnosticos(
+        diagnosticos,
+      );
+
+      final propuestaActual =
+      data["propuesta_actual"];
+
+      if (
+      propuestaActual is Map
+      ) {
+        clientController.setDiagnostico(
+          Map<String, dynamic>.from(
+            propuestaActual,
+          ),
+        );
+      } else {
+        clientController
+            .setDiagnostico(
+          {},
+        );
+      }
+
       return;
     }
 
     if (response.statusCode == 401) {
       controller.logOut();
-      throw Exception('Sesión expirada');
+
+      throw Exception(
+        'Sesión expirada',
+      );
     }
 
-    if (response.statusCode == 400 || response.statusCode == 404) {
-      final data = jsonDecode(response.body);
-      throw Exception(data['error'] ?? 'Error al obtener diagnosticos');
+    if (response.statusCode == 403) {
+      throw Exception(
+        'No tienes permiso para consultar la propuesta',
+      );
     }
 
-    throw Exception('Error inesperado (${response.statusCode})');
+    if (response.statusCode == 404) {
+      clientController
+          .setDiagnosticos(
+        [],
+      );
 
-  } catch (e) {
-    print("ERROR GET DIAGNOSTICOS: $e");
+      clientController
+          .setDiagnostico(
+        {},
+      );
+
+      throw Exception(
+        data["error"] ??
+            'No se encontró una empresa asociada',
+      );
+    }
+
+    throw Exception(
+      data["error"] ??
+          'Error inesperado (${response.statusCode})',
+    );
+
+  } catch (error) {
+    print(
+      'ERROR GET PROPUESTA CLIENTE: $error',
+    );
+
     rethrow;
   }
 }

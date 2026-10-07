@@ -6,4 +6,5 @@ abstract class Routes {
   static const dashboardCliente = '/cliente';
   static const dashboardProveedor = '/proveedor';
   static const dashboardSuperAdmin = '/superadmin';
+  static const changeRequiredPassword = '/change-required-password';
 }

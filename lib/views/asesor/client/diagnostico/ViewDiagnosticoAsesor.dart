@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:finanzas_verdes/views/asesor/client/diagnostico/seleccionarAlternativaDiagnostico.dart';
 
 class Viewdiagnosticoasesor extends StatefulWidget {
   const Viewdiagnosticoasesor({super.key});
@@ -26,35 +27,212 @@ class _ViewdiagnosticoasesorState
   Get.find<ClientController>();
 
   final RxSet<int> activosSeleccionados = <int>{}.obs;
+  final RxMap<int, Map<String, dynamic>> alternativasSeleccionadas = <int, Map<String, dynamic>>{}.obs;
 
   @override
   void initState() {
     super.initState();
 
-    final diagnostico = clientController.Diagnostico;
-    final metricas = diagnostico["metricas"] ?? {};
-    final activos = metricas["activos"] ?? [];
-    final activosGuardados = metricas["activos_seleccionados"];
+    final diagnostico =
+        clientController.Diagnostico;
 
-    if (activosGuardados is List && activosGuardados.isNotEmpty) {
-      for (final id in activosGuardados) {
-        final parsedId = _toInt(id);
+    final metricas =
+        diagnostico["metricas"] ??
+            {};
+
+    final activos =
+    List<dynamic>.from(
+      metricas["activos"] ?? [],
+    );
+
+    final activosGuardados =
+    metricas[
+    "activos_seleccionados"
+    ];
+
+    final alternativasGuardadas =
+    metricas[
+    "alternativas_seleccionadas"
+    ];
+
+    /*
+   * 1. Recuperamos primero las
+   * selecciones ya confirmadas.
+   *
+   * Estas siempre tienen prioridad
+   * sobre la recomendación original.
+   */
+    if (
+    alternativasGuardadas is List
+    ) {
+
+      for (
+      final item
+      in alternativasGuardadas
+      ) {
+
+        if (item is! Map) {
+          continue;
+        }
+
+        final alternativa =
+        Map<String, dynamic>.from(
+          item,
+        );
+
+        final idActivo =
+        _toInt(
+          alternativa["id_activo"],
+        );
+
+        final idItem =
+        _toInt(
+          alternativa["id_item"],
+        );
+
+        if (
+        idActivo == null ||
+            idItem == null
+        ) {
+          continue;
+        }
+
+        alternativasSeleccionadas[
+        idActivo
+        ] = alternativa;
+      }
+    }
+
+    /*
+   * 2. Para los activos que aún no
+   * tienen una selección guardada,
+   * utilizamos el producto recomendado
+   * por la IA.
+   */
+    for (final item in activos) {
+
+      if (item is! Map) {
+        continue;
+      }
+
+      final activo =
+      Map<String, dynamic>.from(
+        item,
+      );
+
+      final idActivo =
+      _toInt(
+        activo["id_activo"],
+      );
+
+      if (idActivo == null) {
+        continue;
+      }
+
+      /*
+     * No sobrescribimos una decisión
+     * humana o guardada anteriormente.
+     */
+      if (
+      alternativasSeleccionadas
+          .containsKey(idActivo)
+      ) {
+        continue;
+      }
+
+      final recomendado =
+      activo[
+      "producto_recomendado"
+      ];
+
+      if (recomendado is! Map) {
+        continue;
+      }
+
+      final alternativaIA =
+      Map<String, dynamic>.from(
+        recomendado,
+      );
+
+      final idItem =
+      _toInt(
+        alternativaIA["id_item"],
+      );
+
+      if (idItem == null) {
+        continue;
+      }
+
+      alternativaIA["id_activo"] =
+          idActivo;
+
+      alternativaIA["cantidad_activo"] =
+          alternativaIA[
+          "cantidad_activo"
+          ] ??
+              activo["cantidad"] ??
+              1;
+
+      alternativaIA["fuente"] =
+      "ia";
+
+      alternativasSeleccionadas[
+      idActivo
+      ] = alternativaIA;
+    }
+
+    /*
+   * 3. Si ya existía una propuesta
+   * guardada, respetamos los activos
+   * confirmados.
+   */
+    if (
+    activosGuardados is List &&
+        activosGuardados.isNotEmpty
+    ) {
+
+      for (
+      final id
+      in activosGuardados
+      ) {
+
+        final parsedId =
+        _toInt(id);
 
         if (parsedId != null) {
-          activosSeleccionados.add(parsedId);
+          activosSeleccionados.add(
+            parsedId,
+          );
         }
       }
 
       return;
     }
 
-    if (activos is List) {
-      for (final activo in activos) {
-        final id = _toInt(activo["id_activo"]);
+    /*
+   * 4. En un diagnóstico nuevo
+   * incluimos inicialmente los activos
+   * que tienen recomendación válida.
+   */
+    for (final item in activos) {
 
-        if (id != null) {
-          activosSeleccionados.add(id);
-        }
+      if (item is! Map) {
+        continue;
+      }
+
+      final idActivo =
+      _toInt(
+        item["id_activo"],
+      );
+
+      if (
+      idActivo != null &&
+          alternativasSeleccionadas
+              .containsKey(idActivo)
+      ) {
+        activosSeleccionados.add(
+          idActivo,
+        );
       }
     }
   }
@@ -75,6 +253,86 @@ class _ViewdiagnosticoasesorState
     return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  double? _toNullableDouble(
+      dynamic value,
+      ) {
+    if (
+    value == null ||
+        value.toString().trim().isEmpty
+    ) {
+      return null;
+    }
+
+    if (value is num) {
+      final result =
+      value.toDouble();
+
+      return result.isFinite
+          ? result
+          : null;
+    }
+
+    final result =
+    double.tryParse(
+      value
+          .toString()
+          .replaceAll(',', '.'),
+    );
+
+    return result != null &&
+        result.isFinite
+        ? result
+        : null;
+  }
+
+  double _parsePrice(dynamic value,) {
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    var text =
+        value
+            ?.toString()
+            .trim() ??
+            '';
+
+    if (text.isEmpty) {
+      return 0;
+    }
+
+    text = text.replaceAll(
+      RegExp(r'[^\d,.-]'),
+      '',
+    );
+
+    if (
+    text.contains('.') &&
+        text.contains(',')
+    ) {
+
+      text = text
+          .replaceAll('.', '')
+          .replaceAll(',', '.');
+
+    } else if (
+    RegExp(
+      r'^\d{1,3}(\.\d{3})+$',
+    ).hasMatch(text)
+    ) {
+
+      text =
+          text.replaceAll('.', '');
+
+    } else {
+
+      text =
+          text.replaceAll(',', '.');
+    }
+
+    return double.tryParse(text) ?? 0;
+  }
+
   List<dynamic> _getActivos(Map diagnostico) {
     return List<dynamic>.from(
       diagnostico["metricas"]?["activos"] ?? [],
@@ -82,64 +340,171 @@ class _ViewdiagnosticoasesorState
   }
 
   Map<String, dynamic> getMetricasSeleccionadas() {
-    final diagnostico = clientController.Diagnostico;
-    final activos = _getActivos(diagnostico);
+    final diagnostico =
+        clientController.Diagnostico;
 
-    double ahorro = 0;
-    double inversion = 0;
-    double energia = 0;
-    double agua = 0;
-    double carbono = 0;
-    int cantidad = 0;
+    final activos =
+    _getActivos(
+      diagnostico,
+    );
+
+    final metricasIncluidas =
+    <Map<String, dynamic>>[];
 
     for (final activo in activos) {
-      final id = _toInt(activo["id_activo"]);
+      final idActivo =
+      _toInt(
+        activo["id_activo"],
+      );
 
-      if (id == null || !activosSeleccionados.contains(id)) {
+      if (
+      idActivo == null ||
+          !activosSeleccionados
+              .contains(idActivo)
+      ) {
         continue;
       }
 
-      cantidad++;
-
-      final metricas = activo["metricas"] ?? {};
-
-      ahorro += _toDouble(
-        metricas["ahorro_economico_mensual"],
-      );
-
-      inversion += _toDouble(
-        metricas["inversion_total_requerida"],
-      );
-
-      energia += _toDouble(
-        metricas["reduccion_energia"],
-      );
-
-      agua += _toDouble(
-        metricas["reduccion_agua"],
-      );
-
-      carbono += _toDouble(
-        metricas["reduccion_carbono"],
+      metricasIncluidas.add(
+        _getMetricasVisualesActivo(
+          activo,
+        ),
       );
     }
 
-    final double? roi = inversion > 0
-        ? (((ahorro * 60) - inversion) / inversion) * 100
+    double? sumarMetricaCompleta(
+        String campo,
+        ) {
+      if (metricasIncluidas.isEmpty) {
+        return null;
+      }
+
+      final valores =
+      metricasIncluidas
+          .map(
+            (metricas) =>
+            _toNullableDouble(
+              metricas[campo],
+            ),
+      )
+          .toList();
+
+      /*
+     * No mostramos un total parcial como
+     * si fuera el resultado completo.
+     */
+      if (
+      valores.any(
+            (value) => value == null,
+      )
+      ) {
+        return null;
+      }
+
+      return valores
+          .whereType<double>()
+          .fold<double>(
+        0,
+            (
+            sum,
+            value,
+            ) =>
+        sum + value,
+      );
+    }
+
+    final ahorro =
+    sumarMetricaCompleta(
+      "ahorro_economico_mensual",
+    );
+
+    final inversion =
+    sumarMetricaCompleta(
+      "inversion_total_requerida",
+    );
+
+    final energia =
+    sumarMetricaCompleta(
+      "reduccion_energia",
+    );
+
+    final agua =
+    sumarMetricaCompleta(
+      "reduccion_agua",
+    );
+
+    final carbono =
+    sumarMetricaCompleta(
+      "reduccion_carbono",
+    );
+
+    final double? roi =
+    inversion != null &&
+        inversion > 0 &&
+        ahorro != null
+        ? (
+        (
+            ahorro * 60 -
+                inversion
+        ) /
+            inversion
+    ) *
+        100
         : null;
 
     final double? payback =
-    ahorro > 0 ? inversion / ahorro : null;
+    inversion != null &&
+        inversion > 0 &&
+        ahorro != null &&
+        ahorro > 0
+        ? inversion / ahorro
+        : null;
+
+    final activosConAhorro =
+        metricasIncluidas
+            .where(
+              (metricas) =>
+          _toNullableDouble(
+            metricas[
+            "ahorro_economico_mensual"
+            ],
+          ) !=
+              null,
+        )
+            .length;
 
     return {
-      "cantidad": cantidad,
-      "ahorro": ahorro,
-      "inversion": inversion,
-      "energia": energia,
-      "agua": agua,
-      "carbono": carbono,
-      "roi": roi,
-      "payback": payback,
+      "cantidad":
+      metricasIncluidas.length,
+
+      "ahorro":
+      ahorro,
+
+      "inversion":
+      inversion,
+
+      "energia":
+      energia,
+
+      "agua":
+      agua,
+
+      "carbono":
+      carbono,
+
+      "roi":
+      roi,
+
+      "payback":
+      payback,
+
+      "cobertura_completa":
+      metricasIncluidas.isNotEmpty &&
+          activosConAhorro ==
+              metricasIncluidas.length,
+
+      "activos_con_metricas":
+      activosConAhorro,
     };
   }
 
@@ -517,7 +882,9 @@ class _ViewdiagnosticoasesorState
               icon: Icons.tune_rounded,
               title: "Simulador de propuesta",
               subtitle:
-              "Selecciona los activos y observa cómo cambian los resultados.",
+              alternativasSeleccionadas.isEmpty
+                  ? "Selecciona los activos y observa cómo cambian los resultados."
+                  : "La inversión usa los productos elegidos. Los ahorros técnicos permanecen como estimación del diagnóstico.",
               color: Global.primary,
             ),
             const SizedBox(height: 14),
@@ -596,7 +963,9 @@ class _ViewdiagnosticoasesorState
                       width: cardWidth,
                       title: "Energía reducida",
                       value:
-                      "${metricas["energia"].toStringAsFixed(1)} kWh",
+                      metricas["energia"] == null
+                          ? "No disponible"
+                          : "${metricas["energia"].toStringAsFixed(1)} kWh",
                       icon: Icons.bolt_rounded,
                       color: const Color(0xFFD19B13),
                     ),
@@ -604,7 +973,9 @@ class _ViewdiagnosticoasesorState
                       width: cardWidth,
                       title: "Agua reducida",
                       value:
-                      "${metricas["agua"].toStringAsFixed(1)} m³",
+                      metricas["agua"] == null
+                          ? "No disponible"
+                          : "${metricas["agua"].toStringAsFixed(1)} m³",
                       icon: Icons.water_drop_outlined,
                       color: const Color(0xFF1597C5),
                     ),
@@ -612,7 +983,9 @@ class _ViewdiagnosticoasesorState
                       width: cardWidth,
                       title: "CO₂ evitado",
                       value:
-                      "${metricas["carbono"].toStringAsFixed(1)} kg",
+                      metricas["carbono"] == null
+                          ? "No disponible"
+                          : "${metricas["carbono"].toStringAsFixed(1)} kg",
                       icon: Icons.eco_outlined,
                       color: const Color(0xFF198B78),
                     ),
@@ -743,13 +1116,141 @@ class _ViewdiagnosticoasesorState
     );
   }
 
+  Map<String, dynamic> _getMetricasVisualesActivo(dynamic activo,) {
+    final originales =
+    Map<String, dynamic>.from(
+      activo["metricas"] ?? {},
+    );
+
+    final idActivo =
+    _toInt(
+      activo["id_activo"],
+    );
+
+    if (idActivo == null) {
+      return originales;
+    }
+
+    final alternativa =
+    alternativasSeleccionadas[
+    idActivo
+    ];
+
+    if (alternativa == null) {
+      return originales;
+    }
+
+    /*
+   * Las alternativas consultadas o ya
+   * guardadas contienen las métricas
+   * oficiales calculadas por el backend.
+   */
+    final metricasAlternativaRaw =
+    alternativa["metricas"];
+
+    if (
+    metricasAlternativaRaw is Map
+    ) {
+      final metricasAlternativa =
+      Map<String, dynamic>.from(
+        metricasAlternativaRaw,
+      );
+
+      return {
+        ...originales,
+        ...metricasAlternativa,
+
+        "escenario_alternativa":
+        true,
+
+        "fuente_alternativa":
+        alternativa["fuente"],
+
+        "id_item_alternativa":
+        alternativa["id_item"],
+      };
+    }
+
+    /*
+   * Compatibilidad con diagnósticos
+   * generados antes de implementar el
+   * cálculo completo.
+   *
+   * En este caso solo podemos actualizar
+   * inversión, ROI y payback, porque no
+   * existen métricas técnicas específicas
+   * de la alternativa.
+   */
+    final precioUnitario =
+    _parsePrice(
+      alternativa["precio_base"],
+    );
+
+    final cantidadActivo =
+        _toInt(
+          alternativa[
+          "cantidad_activo"
+          ],
+        ) ??
+            1;
+
+    final inversion =
+        precioUnitario *
+            cantidadActivo;
+
+    final ahorro =
+    _toNullableDouble(
+      originales[
+      "ahorro_economico_mensual"
+      ],
+    );
+
+    final double? roi =
+    inversion > 0 &&
+        ahorro != null
+        ? (
+        (
+            ahorro * 60 -
+                inversion
+        ) /
+            inversion
+    ) *
+        100
+        : null;
+
+    final double? payback =
+    inversion > 0 &&
+        ahorro != null &&
+        ahorro > 0
+        ? inversion / ahorro
+        : null;
+
+    return {
+      ...originales,
+
+      "inversion_total_requerida":
+      inversion,
+
+      "roi_5_anios":
+      roi,
+
+      "payback":
+      payback,
+
+      "escenario_alternativa":
+      true,
+
+      "metricas_alternativa_disponibles":
+      false,
+    };
+  }
+
   Widget _assetCard(dynamic activo) {
-    final metricas = activo["metricas"] ?? {};
-    final idActivo = _toInt(activo["id_activo"]);
+    final idActivo = _toInt(activo["id_activo"],);
 
     return Obx(() {
-      final selected = idActivo != null &&
-          activosSeleccionados.contains(idActivo);
+      final metricas = _getMetricasVisualesActivo(activo,);
+      final selected = idActivo != null && activosSeleccionados.contains(idActivo);
 
       return Semantics(
         selected: selected,
@@ -944,7 +1445,9 @@ class _ViewdiagnosticoasesorState
                   ),
                 ),
                 const SizedBox(height: 13),
-                _confidenceBlock(activo["confianza"]),
+                _confidenceBlock(activo["confianza"],),
+                const SizedBox(height: 12),
+                _buildAlternativeSelection(activo,),
               ],
             ),
           ),
@@ -1010,6 +1513,276 @@ class _ViewdiagnosticoasesorState
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlternativeSelection(
+      dynamic activo,
+      ) {
+
+    final idActivo =
+    _toInt(
+      activo["id_activo"],
+    );
+
+    if (idActivo == null) {
+      return const SizedBox.shrink();
+    }
+
+    final alternativa =
+    alternativasSeleccionadas[
+    idActivo
+    ];
+
+    if (alternativa == null) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () {
+            _abrirSelectorAlternativa(
+              activo,
+            );
+          },
+
+          style:
+          OutlinedButton.styleFrom(
+            foregroundColor:
+            Global.primary,
+
+            padding:
+            const EdgeInsets.symmetric(
+              horizontal: 13,
+              vertical: 12,
+            ),
+
+            side: BorderSide(
+              color:
+              Global.primary
+                  .withOpacity(.35),
+            ),
+
+            shape:
+            RoundedRectangleBorder(
+              borderRadius:
+              BorderRadius.circular(
+                12,
+              ),
+            ),
+          ),
+
+          icon: const Icon(
+            Icons.compare_arrows_rounded,
+            size: 18,
+          ),
+
+          label: const Text(
+            "Comparar productos",
+          ),
+        ),
+      );
+    }
+
+    final proveedor =
+    alternativa["proveedor"];
+
+    final nombreProveedor =
+    proveedor is Map
+        ? proveedor["nombre"]
+        ?.toString()
+        .trim() ??
+        ""
+        : "";
+
+    final nombreProducto =
+        alternativa["nombre"]
+            ?.toString()
+            .trim() ??
+            "Producto seleccionado";
+
+    final fuente =
+        alternativa["fuente"]
+            ?.toString()
+            .toLowerCase() ??
+            "usuario";
+
+    final recomendadaPorIA =
+        fuente == "ia";
+
+    return Container(
+      width: double.infinity,
+
+      padding:
+      const EdgeInsets.all(12),
+
+      decoration: BoxDecoration(
+        color:
+        Global.primary
+            .withOpacity(.065),
+
+        borderRadius:
+        BorderRadius.circular(13),
+
+        border: Border.all(
+          color:
+          Global.primary
+              .withOpacity(.20),
+        ),
+      ),
+
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                recomendadaPorIA
+                    ? Icons.auto_awesome_rounded
+                    : Icons.check_circle_rounded,
+                size: 17,
+                color:
+                Global.primary,
+              ),
+
+              const SizedBox(width: 7),
+
+              Expanded(
+                child: Text(
+                  recomendadaPorIA
+                      ? "Recomendación de la IA"
+                      : "Alternativa elegida por el usuario",
+                  style:
+                  GoogleFonts.poppins(
+                    fontSize: 10.5,
+                    fontWeight:
+                    FontWeight.w600,
+                    color:
+                    Global.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            nombreProducto,
+            maxLines: 2,
+            overflow:
+            TextOverflow.ellipsis,
+            style:
+            GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight:
+              FontWeight.w600,
+              color: Global.text,
+            ),
+          ),
+
+          if (
+          nombreProveedor.isNotEmpty
+          ) ...[
+            const SizedBox(height: 4),
+
+            Row(
+              children: [
+                Icon(
+                  Icons
+                      .storefront_outlined,
+                  size: 14,
+                  color:
+                  Global
+                      .textSecondary,
+                ),
+
+                const SizedBox(width: 5),
+
+                Expanded(
+                  child: Text(
+                    nombreProveedor,
+                    maxLines: 1,
+                    overflow:
+                    TextOverflow
+                        .ellipsis,
+                    style:
+                    GoogleFonts
+                        .poppins(
+                      fontSize: 10,
+                      color:
+                      Global
+                          .textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 7),
+
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  formatCurrency(
+                    alternativa[
+                    "precio_base"
+                    ],
+                  ),
+                  style:
+                  GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight:
+                    FontWeight.w600,
+                    color:
+                    Global.text,
+                  ),
+                ),
+              ),
+
+              TextButton.icon(
+                onPressed: () {
+                  _abrirSelectorAlternativa(
+                    activo,
+                  );
+                },
+
+                style:
+                TextButton.styleFrom(
+                  foregroundColor:
+                  Global.primary,
+
+                  padding:
+                  const EdgeInsets
+                      .symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+
+                  minimumSize:
+                  Size.zero,
+
+                  tapTargetSize:
+                  MaterialTapTargetSize
+                      .shrinkWrap,
+                ),
+
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  size: 15,
+                ),
+
+                label: Text(
+                  recomendadaPorIA
+                      ? "Ver alternativas"
+                      : "Cambiar",
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1410,6 +2183,387 @@ class _ViewdiagnosticoasesorState
     );
   }
 
+  List<Map<String, dynamic>> _getActivosSinAlternativa() {
+
+    final diagnostico = clientController.Diagnostico;
+
+    final activos =
+    _getActivos(
+      diagnostico,
+    );
+
+    final sinAlternativa =
+    <Map<String, dynamic>>[];
+
+    for (final activo in activos) {
+
+      if (activo is! Map) {
+        continue;
+      }
+
+      final activoMap =
+      Map<String, dynamic>.from(
+        activo,
+      );
+
+      final idActivo =
+      _toInt(
+        activoMap["id_activo"],
+      );
+
+      if (
+      idActivo == null ||
+          !activosSeleccionados
+              .contains(idActivo)
+      ) {
+        continue;
+      }
+
+      final alternativa =
+      alternativasSeleccionadas[
+      idActivo
+      ];
+
+      final idItem =
+      _toInt(
+        alternativa?["id_item"],
+      );
+
+      if (idItem == null) {
+        sinAlternativa.add(
+          activoMap,
+        );
+      }
+    }
+
+    return sinAlternativa;
+  }
+
+  Future<void> _mostrarActivosSinAlternativa(List<Map<String, dynamic>>activos,) async {
+
+    await showDialog<void>(
+      context: context,
+      builder: (
+          dialogContext,
+          ) {
+
+        return AlertDialog(
+          backgroundColor:
+          Global.container,
+
+          shape:
+          RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(
+              18,
+            ),
+          ),
+
+          title: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration:
+                BoxDecoration(
+                  color:
+                  const Color(
+                    0xFFF5A000,
+                  ).withOpacity(.12),
+
+                  borderRadius:
+                  BorderRadius.circular(
+                    12,
+                  ),
+                ),
+                child:
+                const Icon(
+                  Icons
+                      .storefront_outlined,
+                  color:
+                  Color(
+                    0xFFF5A000,
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 11),
+
+              Expanded(
+                child: Text(
+                  "Faltan alternativas",
+                  style:
+                  GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight:
+                    FontWeight.w600,
+                    color: Global.text,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          content:
+          ConstrainedBox(
+            constraints:
+            const BoxConstraints(
+              maxWidth: 460,
+            ),
+
+            child: Column(
+              mainAxisSize:
+              MainAxisSize.min,
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Para continuar debes elegir "
+                      "un producto y proveedor para "
+                      "cada activo incluido.",
+                  style:
+                  GoogleFonts.poppins(
+                    fontSize: 12,
+                    height: 1.5,
+                    color:
+                    Global
+                        .textSecondary,
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 14,
+                ),
+
+                Container(
+                  width:
+                  double.infinity,
+
+                  padding:
+                  const EdgeInsets.all(
+                    12,
+                  ),
+
+                  decoration:
+                  BoxDecoration(
+                    color:
+                    Global.text
+                        .withOpacity(
+                      .035,
+                    ),
+
+                    borderRadius:
+                    BorderRadius.circular(
+                      13,
+                    ),
+
+                    border:
+                    Border.all(
+                      color:
+                      Global.text
+                          .withOpacity(
+                        .08,
+                      ),
+                    ),
+                  ),
+
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment
+                        .start,
+
+                    children:
+                    activos.map(
+                          (activo) {
+
+                        return Padding(
+                          padding:
+                          const EdgeInsets
+                              .symmetric(
+                            vertical: 4,
+                          ),
+
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons
+                                    .circle,
+                                size: 6,
+                                color:
+                                Global
+                                    .primary,
+                              ),
+
+                              const SizedBox(
+                                width: 8,
+                              ),
+
+                              Expanded(
+                                child: Text(
+                                  activo[
+                                  "nombre_activo"
+                                  ]
+                                      ?.toString() ??
+                                      "Activo sin nombre",
+
+                                  style:
+                                  GoogleFonts
+                                      .poppins(
+                                    fontSize:
+                                    11.5,
+                                    color:
+                                    Global
+                                        .text,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ).toList(),
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 12,
+                ),
+
+                Text(
+                  "Puedes elegir una alternativa "
+                      "o retirar el activo de la propuesta.",
+                  style:
+                  GoogleFonts.poppins(
+                    fontSize: 10.5,
+                    height: 1.45,
+                    color:
+                    Global
+                        .textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          actions: [
+            FilledButton(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop();
+              },
+
+              style:
+              FilledButton.styleFrom(
+                backgroundColor:
+                Global.primary,
+
+                foregroundColor:
+                Colors.white,
+
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    11,
+                  ),
+                ),
+              ),
+
+              child:
+              const Text(
+                "Revisar activos",
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _abrirSelectorAlternativa(dynamic activo,) async {
+
+    final idDiagnostico =
+    _toInt(
+      clientController
+          .Diagnostico[
+      "id_diagnostico"
+      ],
+    );
+
+    final idActivo =
+    _toInt(
+      activo["id_activo"],
+    );
+
+    if (
+    idDiagnostico == null ||
+        idActivo == null
+    ) {
+
+      Get.snackbar(
+        "Información incompleta",
+        "No fue posible identificar "
+            "el diagnóstico o el activo.",
+        snackPosition:
+        SnackPosition.BOTTOM,
+        margin:
+        const EdgeInsets.all(16),
+      );
+
+      return;
+    }
+
+    final alternativa =
+    await mostrarSelectorAlternativaDiagnostico(
+      context: context,
+
+      idDiagnostico:
+      idDiagnostico,
+
+      idActivo:
+      idActivo,
+
+      seleccionActual:
+      alternativasSeleccionadas[
+      idActivo
+      ],
+    );
+
+    if (
+    alternativa == null ||
+        !mounted
+    ) {
+      return;
+    }
+
+    final seleccion =
+    Map<String, dynamic>.from(
+      alternativa,
+    );
+
+    /*
+   * Guardamos también el activo al que
+   * corresponde la alternativa.
+   */
+    seleccion["id_activo"] = idActivo;
+    seleccion["fuente"] = "usuario";
+    seleccion["seleccionado_at"] = DateTime.now().toIso8601String();
+
+    alternativasSeleccionadas[
+    idActivo
+    ] = seleccion;
+
+    /*
+   * Si eligió una alternativa, incluimos
+   * automáticamente el activo dentro de
+   * la propuesta.
+   */
+    activosSeleccionados.add(
+      idActivo,
+    );
+  }
+
   void _toggleAsset(int idActivo) {
     if (activosSeleccionados.contains(idActivo)) {
       activosSeleccionados.remove(idActivo);
@@ -1477,12 +2631,21 @@ class _ViewdiagnosticoasesorState
     return "${_toDouble(value).toStringAsFixed(1)} $unit";
   }
 
-  String formatCurrency(dynamic value) {
+  String formatCurrency(dynamic value,) {
+    final amount =
+    _toNullableDouble(
+      value,
+    );
+
+    if (amount == null) {
+      return "No disponible";
+    }
+
     return NumberFormat.currency(
       locale: 'es_CO',
       symbol: '\$ ',
       decimalDigits: 0,
-    ).format(_toDouble(value));
+    ).format(amount);
   }
 
   Future<void> mostrarModalDecisionCliente(
@@ -1666,6 +2829,20 @@ class _ViewdiagnosticoasesorState
       return;
     }
 
+    if (decision == "activo") {
+
+      final activosSinAlternativa = _getActivosSinAlternativa();
+
+      if (activosSinAlternativa.isNotEmpty) {
+
+        await _mostrarActivosSinAlternativa(
+          activosSinAlternativa,
+        );
+
+        return;
+      }
+    }
+
     setState(() {
       loading = true;
     });
@@ -1674,7 +2851,7 @@ class _ViewdiagnosticoasesorState
       if (decision == "activo") {
         final metricas = getMetricasSeleccionadas();
 
-        await guardarSeleccionActivosDiagnosticoApi(
+        final response = await guardarSeleccionActivosDiagnosticoApi(
           idDiagnostico:
           clientController.Diagnostico["id_diagnostico"],
           activosSeleccionados: activosSeleccionados.toList(),
@@ -1687,7 +2864,23 @@ class _ViewdiagnosticoasesorState
             "roi": metricas["roi"],
             "payback": metricas["payback"],
           },
+          alternativasSeleccionadas:
+          alternativasSeleccionadas
+              .entries
+              .where(
+                (entry) => activosSeleccionados.contains(entry.key,),).map(
+                (entry) => {
+                  "id_activo": entry.key,
+                  "id_item": entry.value["id_item"],
+                  "fuente": entry.value["fuente"] ?? "usuario",},).toList(),
         );
+
+        final diagnosticoActualizado = response["diagnostico"];
+
+        if (diagnosticoActualizado is Map) {
+          clientController.setDiagnostico(Map<String, dynamic>.from(diagnosticoActualizado,),);
+        }
+
       }
 
       await editClientApi(

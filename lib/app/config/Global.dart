@@ -215,18 +215,18 @@ class Global {
   ];
 
   static List<String> tiposActivo = [
-    "Neveras",
-    "Televisores",
-    "Hornos",
-    "Climatización",
-    "Vitrinas",
-    "Refrigeración",
-    "Secadoras",
-    "Iluminación",
-    "Lavadoras",
-    "Lava vajillas",
-    "Sanitarios",
-    "Grifos",
+    "Neveras", // SI PERO NO COMERCIALES
+    "Televisores", // SI
+    "Hornos", // NO
+    "Climatización", // HAY PESTAÑA PERO SOLO APARECEN VENTILADORES
+    "Vitrinas", // NO
+    "Refrigeración", // NO
+    "Secadoras", // NO HAY ENLA PESTAÑA
+    "Iluminación", // NO
+    "Lavadoras", // SI
+    "Lava vajillas", // SOLO UNO
+    "Sanitarios", // SI
+    "Grifos", // SI
     "Otro",
   ];
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:finanzas_verdes/app/config/Global.dart';
@@ -9,37 +10,111 @@ import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 
 Future<void> getRolsApi({
-  required RolController rolController
+  required RolController
+  rolController,
 }) async {
-  final uri = Uri.parse('${Global.baseUrl}rol');
-  final token = GetStorage().read("token");
+  final uri =
+  Uri.parse(
+    '${Global.baseUrl}rol',
+  );
+
+  final token =
+  GetStorage()
+      .read(
+    'token',
+  );
+
+  rolController.setLoading(
+    true,
+  );
 
   try {
-    final response = await http.get(
+    final response =
+    await http.get(
       uri,
       headers: {
-        "Authorization" : "Bearer $token"
-      }
+        'Authorization':
+        'Bearer $token',
+        'Content-Type':
+        'application/json',
+      },
     );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      rolController.setRols(data["rols"]);
+    final dynamic decoded =
+    response.body.isNotEmpty
+        ? jsonDecode(
+      response.body,
+    )
+        : <String, dynamic>{};
+
+    final data =
+    decoded
+    is Map<String, dynamic>
+        ? decoded
+        : <String, dynamic>{};
+
+    if (
+    response.statusCode ==
+        200
+    ) {
+      final roles =
+      data['rols']
+      is List
+          ? data['rols']
+      as List
+          : <dynamic>[];
+
+      rolController.setRols(
+        roles,
+      );
+
+      rolController.setSummary(
+        data['summary']
+        is Map
+            ? Map<String, dynamic>.from(
+          data['summary'],
+        )
+            : null,
+      );
+
       return;
     }
 
-    // ⚠️ Errores controlados del backend
-    if (response.statusCode == 400 || response.statusCode == 409) {
-      final data = jsonDecode(response.body);
-      throw Exception(data['error'] ?? 'Error de validación');
+    if (
+    response.statusCode ==
+        401
+    ) {
+      controller.logOut();
+
+      return;
     }
 
-    // ❌ Cualquier otro error inesperado
-    throw Exception('Error inesperado (${response.statusCode})');
+    if (
+    response.statusCode ==
+        403
+    ) {
+      throw Exception(
+        data['error'] ??
+            'No tienes permiso para consultar los roles',
+      );
+    }
 
-  } catch (e) {
-    print("ERROR ESPECIAL AL OBTENER LOS ROLES: $e");
+    throw Exception(
+      data['error'] ??
+          'No fue posible obtener los roles (${response.statusCode})',
+    );
+
+  } catch (error) {
+    print(
+      'ERROR AL OBTENER ROLES: $error',
+    );
+
     rethrow;
+
+  } finally {
+    rolController.setLoading(
+      false,
+    );
   }
 }
 
@@ -51,11 +126,26 @@ Future<Map> getRolApi({
   final token = GetStorage().read("token");
 
   try {
-    final response = await http.get(
+    final response =
+    await http
+        .get(
       uri,
       headers: {
-        "Authorization" : "Bearer $token"
-      }
+        'Authorization':
+        'Bearer $token',
+        'Content-Type':
+        'application/json',
+      },
+    )
+        .timeout(
+      const Duration(
+        seconds: 30,
+      ),
+      onTimeout: () {
+        throw TimeoutException(
+          'El servidor tardó demasiado en consultar los roles',
+        );
+      },
     );
 
     if (response.statusCode == 200) {
@@ -212,5 +302,120 @@ Future<void> toggleRolPermissionApi({
   } catch (e) {
     print("ERROR ESPECIAL AL INSERTAR EL PERMISO: $e");
     rethrow;
+  }
+}
+
+Future<Map<String, dynamic>> replaceRolePermissionsApi({
+  required int idRol,
+  required Iterable<int>
+  permissionIds,
+  required String motivo,
+  required RolController
+  rolController,
+}) async {
+  final uri =
+  Uri.parse(
+    '${Global.baseUrl}rol/$idRol/permissions',
+  );
+
+  final token =
+  GetStorage()
+      .read(
+    'token',
+  );
+
+  rolController.setSaving(
+    true,
+  );
+
+  try {
+    final response =
+    await http.put(
+      uri,
+      headers: {
+        'Authorization':
+        'Bearer $token',
+        'Content-Type':
+        'application/json',
+      },
+      body: jsonEncode({
+        'permission_ids':
+        permissionIds
+            .toSet()
+            .toList(),
+
+        'motivo':
+        motivo.trim(),
+      }),
+    );
+
+    final dynamic decoded =
+    response.body.isNotEmpty
+        ? jsonDecode(
+      response.body,
+    )
+        : <String, dynamic>{};
+
+    final data =
+    decoded
+    is Map<String, dynamic>
+        ? decoded
+        : <String, dynamic>{};
+
+    if (
+    response.statusCode ==
+        200
+    ) {
+      await getRolsApi(
+        rolController:
+        rolController,
+      );
+
+      return data;
+    }
+
+    if (
+    response.statusCode ==
+        401
+    ) {
+      controller.logOut();
+
+      throw Exception(
+        'La sesión ha expirado',
+      );
+    }
+
+    if (
+    response.statusCode ==
+        400 ||
+        response.statusCode ==
+            403 ||
+        response.statusCode ==
+            404 ||
+        response.statusCode ==
+            409
+    ) {
+      throw Exception(
+        data['error'] ??
+            'No fue posible actualizar los permisos',
+      );
+    }
+
+    throw Exception(
+      data['error'] ??
+          'Error inesperado (${response.statusCode})',
+    );
+
+  } catch (error) {
+    print(
+      'ERROR AL GUARDAR PERMISOS DEL ROL: $error',
+    );
+
+    rethrow;
+
+  } finally {
+    rolController.setSaving(
+      false,
+    );
   }
 }

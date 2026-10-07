@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart';
 import 'package:intl/intl.dart';
+import 'package:finanzas_verdes/models/api/prospectoApi.dart';
 
 class ClienteAgendaCard extends StatelessWidget {
 
@@ -27,9 +28,8 @@ class ClienteAgendaCard extends StatelessWidget {
 
     final screenWidth = MediaQuery.sizeOf(context).width;
 
-    final double cardWidth = (screenWidth - 44)
-        .clamp(300.0, 380.0)
-        .toDouble();
+    final double cardWidth = (screenWidth - 44).clamp(300.0, 380.0).toDouble();
+    final bool isProspect = cliente["tipo_entidad"] == "prospecto";
 
     return Container(
       width: cardWidth,
@@ -89,7 +89,10 @@ class ClienteAgendaCard extends StatelessWidget {
                     const SizedBox(height: 2),
 
                     Text(
-                      cliente["nombre_mipyme"]?.toString() ??
+                      isProspect
+                          ? "Prospecto corporativo"
+                          : cliente["nombre_mipyme"]
+                          ?.toString() ??
                           "Empresa no registrada",
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -188,23 +191,122 @@ class ClienteAgendaCard extends StatelessWidget {
                   height: 40,
                   child: FilledButton.icon(
                     onPressed: () async {
-                      if (cliente["estado"] == "activo") {
-                        clientController.setClient(
-                          await getClientDetailApi(
-                            idUsuario: cliente["id_usuario"],
-                          ),
+
+                      final tipoEntidad =
+                          cliente[
+                          "tipo_entidad"] ??
+                              "cliente";
+
+
+                      /*
+   * ==================================
+   * PROSPECTO
+   * ==================================
+   */
+                      if (
+                      tipoEntidad ==
+                          "prospecto"
+                      ) {
+
+                        /*
+     * Ya fue convertido.
+     */
+                        if (
+                        cliente[
+                        "estado"] ==
+                            "convertido" &&
+                            cliente[
+                            "id_usuario"] !=
+                                null
+                        ) {
+
+                          clientController.setClient(
+
+                            await getClientDetailApi(
+
+                              idUsuario:
+                              cliente[
+                              "id_usuario"],
+
+                            ),
+
+                          );
+
+
+                          controller.setPage(
+                            AsesorRoutes
+                                .dashBoardClient,
+                          );
+
+
+                          return;
+
+                        }
+
+
+                        await mostrarModalDecisionCliente(
+
+                          context,
+
+                          cliente,
+
+                          clientController,
+
                         );
 
-                        controller.setPage(
-                          AsesorRoutes.dashBoardClient,
-                        );
-                      } else if (cliente["estado"] == "nuevo") {
-                        mostrarModalDecisionCliente(
-                          context,
-                          cliente,
-                          clientController,
-                        );
+
+                        return;
+
                       }
+
+
+                      /*
+   * ==================================
+   * CLIENTE FV TRADICIONAL
+   * ==================================
+   */
+                      if (
+                      cliente[
+                      "estado"] ==
+                          "activo"
+                      ) {
+
+                        clientController.setClient(
+
+                          await getClientDetailApi(
+
+                            idUsuario:
+                            cliente[
+                            "id_usuario"],
+
+                          ),
+
+                        );
+
+
+                        controller.setPage(
+                          AsesorRoutes
+                              .dashBoardClient,
+                        );
+
+                      } else if (
+                      cliente[
+                      "estado"] ==
+                          "nuevo"
+                      ) {
+
+                        await mostrarModalDecisionCliente(
+
+                          context,
+
+                          cliente,
+
+                          clientController,
+
+                        );
+
+                      }
+
                     },
                     icon: const Icon(
                       Icons.play_arrow_rounded,
@@ -335,261 +437,335 @@ class ClienteAgendaCard extends StatelessWidget {
   }
 }
 
-Future<void> mostrarModalDecisionCliente(BuildContext context, Map<String, dynamic> usuario, ClientController clientController,) async {
+Future<void>
+mostrarModalDecisionCliente(
+    BuildContext context,
+    Map<String, dynamic> usuario,
+    ClientController clientController,
+    ) async {
 
   String? decision;
+
 
   final motivoController =
   TextEditingController();
 
-  DateTime? nuevaFecha;
+
+  final nombreMipymeController =
+  TextEditingController();
+
+
+  final bool isProspect =
+      usuario[
+      "tipo_entidad"] ==
+          "prospecto";
+
 
   await showDialog(
-    context: context,
-    builder: (context) {
+
+    context:
+    context,
+
+    builder:
+        (context) {
 
       return StatefulBuilder(
-        builder: (
+
+        builder:
+            (
             context,
             setModalState,
             ) {
 
           return AlertDialog(
 
-            shape: RoundedRectangleBorder(
+            shape:
+            RoundedRectangleBorder(
               borderRadius:
-              BorderRadius.circular(20),
+              BorderRadius.circular(
+                20,
+              ),
             ),
 
-            title: const Text(
+            title:
+            const Text(
               "Decisión del cliente",
             ),
 
-            content: SizedBox(
+            content:
+            SizedBox(
 
-              width: 500,
+              width:
+              500,
 
-              child: SingleChildScrollView(
+              child:
+              SingleChildScrollView(
 
-                child: Column(
+                child:
+                Column(
 
                   mainAxisSize:
-                  MainAxisSize.min,
+                  MainAxisSize
+                      .min,
 
                   crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
 
                   children: [
 
                     Text(
-                      "Luego de comentar sobre el proyecto, registra la decisión tomada por el cliente.",
-                      style: TextStyle(
+
+                      "Luego de presentar el proyecto, registra la decisión tomada por el cliente.",
+
+                      style:
+                      TextStyle(
                         color:
-                        Colors.grey.shade700,
+                        Colors.grey
+                            .shade700,
                       ),
+
                     ),
 
                     const SizedBox(
-                      height: 20,
+                      height:
+                      20,
                     ),
 
+
                     _opcionDecision(
+
                       titulo:
                       "Confirmar proceso",
+
                       icon:
-                      Icons.check_circle,
-                      color: Colors.green,
+                      Icons
+                          .check_circle,
+
+                      color:
+                      Colors.green,
+
                       seleccionado:
                       decision ==
                           "activo",
-                      onTap: () {
-                        setModalState(() {
-                          decision =
-                          "activo";
-                        });
+
+                      onTap:
+                          () {
+
+                        setModalState(
+                              () {
+
+                            decision =
+                            "activo";
+
+                          },
+                        );
+
                       },
+
                     ),
+
 
                     const SizedBox(
-                      height: 10,
+                      height:
+                      10,
                     ),
 
+
                     _opcionDecision(
+
                       titulo:
                       "Posponer visita",
+
                       icon:
-                      Icons.pause_circle,
+                      Icons
+                          .schedule_rounded,
+
                       color:
                       Colors.orange,
+
                       seleccionado:
                       decision ==
                           "pospuesto",
-                      onTap: () {
-                        setModalState(() {
-                          decision =
-                          "pospuesto";
-                        });
+
+                      onTap:
+                          () {
+
+                        setModalState(
+                              () {
+
+                            decision =
+                            "pospuesto";
+
+                          },
+                        );
+
                       },
+
                     ),
+
 
                     const SizedBox(
-                      height: 10,
+                      height:
+                      10,
                     ),
 
+
                     _opcionDecision(
+
                       titulo:
                       "Reprogramar visita",
+
                       icon:
-                      Icons.calendar_month,
+                      Icons
+                          .event_repeat_rounded,
+
                       color:
                       Colors.blue,
+
                       seleccionado:
                       decision ==
                           "reprogramar",
-                      onTap: () {
-                        setModalState(() {
-                          decision =
-                          "reprogramar";
-                        });
+
+                      onTap:
+                          () {
+
+                        setModalState(
+                              () {
+
+                            decision =
+                            "reprogramar";
+
+                          },
+                        );
+
                       },
+
                     ),
+
 
                     const SizedBox(
-                      height: 10,
+                      height:
+                      10,
                     ),
 
+
                     _opcionDecision(
+
                       titulo:
-                      "No continuar con el proceso",
+                      "No continuar",
+
                       icon:
-                      Icons.cancel,
-                      color: Colors.red,
+                      Icons
+                          .cancel_outlined,
+
+                      color:
+                      Colors.red,
+
                       seleccionado:
                       decision ==
                           "desinteresado",
-                      onTap: () {
-                        setModalState(() {
-                          decision =
-                          "desinteresado";
-                        });
+
+                      onTap:
+                          () {
+
+                        setModalState(
+                              () {
+
+                            decision =
+                            "desinteresado";
+
+                          },
+                        );
+
                       },
+
                     ),
 
-                    const SizedBox(
-                      height: 20,
-                    ),
 
-                    if (decision ==
-                        "pospuesto")
-                      TextField(
-                        controller:
-                        motivoController,
-                        maxLines: 3,
-                        decoration:
-                        const InputDecoration(
-                          border:
-                          OutlineInputBorder(),
-                          labelText:
-                          "Motivo del aplazamiento",
-                          hintText:
-                          "Ej. El cliente desea que lo contacten nuevamente en unos meses",
-                        ),
+                    /*
+                     * Solo necesitamos pedir
+                     * el nombre del negocio
+                     * al convertir un prospecto.
+                     */
+                    if (
+                    isProspect &&
+                        decision ==
+                            "activo"
+                    ) ...[
+
+                      const SizedBox(
+                        height:
+                        18,
                       ),
 
-                    if (decision ==
-                        "desinteresado")
                       TextField(
+
                         controller:
-                        motivoController,
-                        maxLines: 3,
+                        nombreMipymeController,
+
                         decoration:
                         const InputDecoration(
+
+                          labelText:
+                          "Nombre del negocio",
+
+                          hintText:
+                          "Nombre comercial o razón social",
+
+                          prefixIcon:
+                          Icon(
+                            Icons
+                                .storefront_outlined,
+                          ),
+
                           border:
                           OutlineInputBorder(),
-                          labelText:
-                          "Motivo del rechazo",
-                          hintText:
-                          "Describe por qué no continuará",
+
                         ),
+
                       ),
 
-                    // if (decision ==
-                    //     "reprogramar")
-                    //   Column(
-                    //     children: [
-                    //
-                    //       ListTile(
-                    //
-                    //         shape:
-                    //         RoundedRectangleBorder(
-                    //           borderRadius:
-                    //           BorderRadius.circular(
-                    //             12,
-                    //           ),
-                    //           side:
-                    //           BorderSide(
-                    //             color:
-                    //             Colors.blue,
-                    //           ),
-                    //         ),
-                    //
-                    //         leading:
-                    //         const Icon(
-                    //           Icons
-                    //               .calendar_today,
-                    //           color:
-                    //           Colors.blue,
-                    //         ),
-                    //
-                    //         title: Text(
-                    //
-                    //           nuevaFecha ==
-                    //               null
-                    //               ? "Seleccionar nueva fecha"
-                    //               : "${nuevaFecha!.day}/${nuevaFecha!.month}/${nuevaFecha!.year}",
-                    //
-                    //         ),
-                    //
-                    //         trailing:
-                    //         const Icon(
-                    //           Icons.edit,
-                    //         ),
-                    //
-                    //         onTap:
-                    //             () async {
-                    //
-                    //           final fecha =
-                    //           await showDatePicker(
-                    //             context:
-                    //             context,
-                    //             initialDate:
-                    //             DateTime
-                    //                 .now(),
-                    //             firstDate:
-                    //             DateTime
-                    //                 .now(),
-                    //             lastDate:
-                    //             DateTime(
-                    //               2100,
-                    //             ),
-                    //           );
-                    //
-                    //           if (fecha !=
-                    //               null) {
-                    //             setModalState(
-                    //                   () {
-                    //                 nuevaFecha =
-                    //                     fecha;
-                    //               },
-                    //             );
-                    //           }
-                    //
-                    //         },
-                    //
-                    //       ),
-                    //
-                    //     ],
-                    //   ),
+                    ],
+
+
+                    if (
+                    decision ==
+                        "pospuesto" ||
+                        decision ==
+                            "desinteresado"
+                    ) ...[
+
+                      const SizedBox(
+                        height:
+                        18,
+                      ),
+
+                      TextField(
+
+                        controller:
+                        motivoController,
+
+                        maxLines:
+                        3,
+
+                        decoration:
+                        InputDecoration(
+
+                          labelText:
+                          decision ==
+                              "pospuesto"
+                              ? "Motivo del aplazamiento"
+                              : "Motivo por el cual no continúa",
+
+                          border:
+                          const OutlineInputBorder(),
+
+                        ),
+
+                      ),
+
+                    ],
 
                   ],
 
@@ -599,126 +775,368 @@ Future<void> mostrarModalDecisionCliente(BuildContext context, Map<String, dynam
 
             ),
 
-            actions: [
+            actions:
+            [
 
               TextButton(
-                onPressed: () {
-                  Navigator.pop(
-                    context,
-                  );
-                },
-                child: const Text(
-                  "Cerrar",
+
+                onPressed:
+                    () =>
+                    Navigator.pop(
+                      context,
+                    ),
+
+                child:
+                const Text(
+                  "Cancelar",
                 ),
+
               ),
+
 
               ElevatedButton(
 
                 onPressed:
-                decision == null
+                decision ==
+                    null
                     ? null
                     : () async {
 
+                  final motivo =
+                  motivoController
+                      .text
+                      .trim();
+
+
                   if (
-                  decision ==
-                      "desinteresado" &&
-                      motivoController
-                          .text
-                          .trim()
-                          .isEmpty) {
+                  (
+                      decision ==
+                          "desinteresado" ||
+                          decision ==
+                              "pospuesto"
+                  ) &&
+                      motivo.isEmpty
+                  ) {
 
                     Get.snackbar(
                       "Campo requerido",
-                      "Debe indicar el motivo del rechazo",
-                      backgroundColor: Colors.red,
-                      colorText: Colors.white
+                      "Debe indicar el motivo.",
+                      backgroundColor:
+                      Colors.red,
+                      colorText:
+                      Colors.white,
                     );
 
                     return;
+
                   }
 
+
                   if (
-                  decision ==
-                      "pospuesto" &&
-                      motivoController
+                  isProspect &&
+                      decision ==
+                          "activo" &&
+                      nombreMipymeController
                           .text
                           .trim()
-                          .isEmpty) {
+                          .isEmpty
+                  ) {
 
                     Get.snackbar(
                       "Campo requerido",
-                      "Debe indicar el motivo del aplazamiento",
-                      backgroundColor: Colors.red,
-                      colorText: Colors.white
+                      "Debe indicar el nombre del negocio.",
+                      backgroundColor:
+                      Colors.red,
+                      colorText:
+                      Colors.white,
                     );
 
                     return;
+
                   }
 
-                  // if (
-                  // decision ==
-                  //     "reprogramar" &&
-                  //     nuevaFecha ==
-                  //         null) {
-                  //
-                  //   Get.snackbar(
-                  //     "Campo requerido",
-                  //     "Debe seleccionar una fecha",
-                  //   );
-                  //
-                  //   return;
-                  // }
 
-                  Navigator.pop(context,);
+                  Navigator.pop(
+                    context,
+                  );
 
-                  if (decision == "reprogramar") {
 
-                    mostrarModalEditarCalendario(context, usuario);
+                  /*
+                     * ==========================
+                     * REPROGRAMAR
+                     * ==========================
+                     */
+                  if (
+                  decision ==
+                      "reprogramar"
+                  ) {
+
+                    await mostrarModalEditarCalendario(
+                      context,
+                      usuario,
+                    );
+
+
+                    await controller.loadRange(
+                      controller
+                          .firstDate
+                          .value,
+
+                      controller
+                          .endDate
+                          .value,
+                    );
+
+
+                    await getClientsAgendaApi();
+
 
                     return;
+
                   }
+
+
+                  /*
+                     * ==========================
+                     * PROSPECTO
+                     * ==========================
+                     */
+                  if (
+                  isProspect
+                  ) {
+
+                    final idProspecto =
+                    usuario[
+                    "id_prospecto"];
+
+
+                    if (
+                    idProspecto ==
+                        null
+                    ) {
+
+                      Get.snackbar(
+                        "Error",
+                        "No se encontró el identificador del prospecto.",
+                      );
+
+                      return;
+
+                    }
+
+
+                    try {
+
+                      /*
+                         * ACEPTÓ.
+                         */
+                      if (
+                      decision ==
+                          "activo"
+                      ) {
+
+                        final response =
+                        await convertirProspectoApi(
+
+                          idProspecto:
+                          idProspecto,
+
+                          nombreMipyme:
+                          nombreMipymeController
+                              .text
+                              .trim(),
+
+                        );
+
+
+                        final newUser =
+                        response[
+                        "usuario"]
+                        as Map<String, dynamic>?;
+
+
+                        final idUsuario =
+                            newUser?[
+                            "id_usuario"] ??
+                                response[
+                                "id_usuario"];
+
+
+                        if (
+                        idUsuario ==
+                            null
+                        ) {
+
+                          throw Exception(
+                            "No se recibió el usuario creado",
+                          );
+
+                        }
+
+
+                        clientController.setClient(
+
+                          await getClientDetailApi(
+
+                            idUsuario:
+                            idUsuario,
+
+                          ),
+
+                        );
+
+
+                        controller.setPage(
+
+                          AsesorRoutes
+                              .dashBoardClient,
+
+                        );
+
+                      }
+
+                      /*
+                         * POSPUSO / NO CONTINÚA.
+                         */
+                      else {
+
+                        await actualizarDecisionProspectoApi(
+
+                          idProspecto:
+                          idProspecto,
+
+                          decision:
+                          decision!,
+
+                          motivo:
+                          motivo,
+
+                        );
+
+                      }
+
+
+                      await controller.loadRange(
+
+                        controller
+                            .firstDate
+                            .value,
+
+                        controller
+                            .endDate
+                            .value,
+
+                      );
+
+
+                      await getClientsAgendaApi();
+
+
+                    } catch (e) {
+
+                      Get.snackbar(
+
+                        "Error",
+
+                        e
+                            .toString()
+                            .replaceFirst(
+                          "Exception: ",
+                          "",
+                        ),
+
+                        backgroundColor:
+                        Colors.red,
+
+                        colorText:
+                        Colors.white,
+
+                      );
+
+                    }
+
+
+                    return;
+
+                  }
+
+
+                  /*
+                     * ==========================
+                     * CLIENTE FV EXISTENTE
+                     * ==========================
+                     */
 
                   await editClientApi(
+
                     idUsuario:
                     usuario[
                     "id_usuario"],
+
                     updatedBy:
-                    controller.User[
+                    controller
+                        .User[
                     "id_usuario"],
+
                     clientController:
-                    Get.find<
-                        ClientController>(),
+                    clientController,
+
                     estado:
                     decision,
+
                     estado_observaciones:
-                    motivoController
-                        .text,
+                    motivo,
+
                   );
+
 
                   if (
                   decision ==
-                      "activo") {
+                      "activo"
+                  ) {
 
-                    clientController
-                        .setClient(
+                    clientController.setClient(
+
                       await getClientDetailApi(
+
                         idUsuario:
                         usuario[
                         "id_usuario"],
+
                       ),
+
                     );
 
-                    controller
-                        .setPage(
+
+                    controller.setPage(
+
                       AsesorRoutes
                           .dashBoardClient,
+
                     );
 
                   }
 
+
+                  await controller.loadRange(
+
+                    controller
+                        .firstDate
+                        .value,
+
+                    controller
+                        .endDate
+                        .value,
+
+                  );
+
+
+                  await getClientsAgendaApi();
+
                 },
 
-                child: const Text(
+                child:
+                const Text(
                   "Guardar decisión",
                 ),
 
@@ -730,8 +1148,19 @@ Future<void> mostrarModalDecisionCliente(BuildContext context, Map<String, dynam
 
         },
       );
+
     },
+
   );
+
+
+  motivoController
+      .dispose();
+
+
+  nombreMipymeController
+      .dispose();
+
 }
 
 Widget _opcionDecision({

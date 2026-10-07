@@ -42,7 +42,6 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
         AsesorRoutes.newPlanTrabajo,
         AsesorRoutes.editPlanTrabajo,
         AsesorRoutes.viewPlanTrabajo,
-        AsesorRoutes.newRequerimiento,
       ],
     },
   ];
@@ -56,7 +55,7 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
     }
 
     return Obx(
-          () => AnimatedContainer(
+      () => AnimatedContainer(
         duration: const Duration(milliseconds: 240),
         curve: Curves.easeOutCubic,
         width: isCollapsed ? 72 : 250,
@@ -90,8 +89,9 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
                     final icon = module["logo"] as IconData;
                     final route = module["route"] as String;
 
-                    final isSelected = (module["inPage"] as List)
-                        .contains(controller.Page);
+                    final isSelected = (module["inPage"] as List).contains(
+                      controller.Page,
+                    );
 
                     return _menuItem(
                       title: nombre,
@@ -174,9 +174,7 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
               ),
 
             Tooltip(
-              message: isCollapsed
-                  ? "Expandir menú"
-                  : "Contraer menú",
+              message: isCollapsed ? "Expandir menú" : "Contraer menú",
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -224,9 +222,7 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
-          constraints: BoxConstraints(
-            minHeight: subtitle == null ? 46 : 58,
-          ),
+          constraints: BoxConstraints(minHeight: subtitle == null ? 46 : 58),
           padding: EdgeInsets.symmetric(
             horizontal: isCollapsed ? 0 : 12,
             vertical: 8,
@@ -234,8 +230,8 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
           decoration: BoxDecoration(
             color: selected
                 ? Global.primary.withOpacity(
-              controller.isDark.value ? 0.18 : 0.10,
-            )
+                    controller.isDark.value ? 0.18 : 0.10,
+                  )
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(11),
           ),
@@ -247,9 +243,7 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
               Icon(
                 icon,
                 size: 21,
-                color: selected
-                    ? Global.primary
-                    : Global.textSecondary,
+                color: selected ? Global.primary : Global.textSecondary,
               ),
 
               if (!isCollapsed) ...[
@@ -258,8 +252,7 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         title,
@@ -270,9 +263,7 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
                           fontWeight: selected
                               ? FontWeight.w600
                               : FontWeight.w400,
-                          color: selected
-                              ? Global.primary
-                              : Global.text,
+                          color: selected ? Global.primary : Global.text,
                         ),
                       ),
 
@@ -332,9 +323,7 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
         child: SizedBox(
           width: 20,
           height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-          ),
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
       );
     }
@@ -346,11 +335,7 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
         vertical: 10,
       ),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: Global.text.withOpacity(0.08),
-          ),
-        ),
+        border: Border(top: BorderSide(color: Global.text.withOpacity(0.08))),
       ),
       child: Row(
         mainAxisAlignment: isCollapsed

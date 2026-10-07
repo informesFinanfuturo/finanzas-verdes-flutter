@@ -333,57 +333,610 @@ Future<void> deleteImagenItem({
   }
 }
 
-Future<Map<String, dynamic>> testCatalogCrawler() async {
+void closeLoader() {
+  if (Get.isDialogOpen == true) {
+    Get.back(closeOverlays: true);
+  }
+}
 
-  final uri = Uri.parse(
-    '${Global.baseUrl}catalogo/refresh',
-  );
+String _catalogApiErrorMessage(
+    http.Response response,
+    ) {
+  try {
+    final decoded =
+    jsonDecode(
+      response.body,
+    );
 
-  final token = GetStorage().read("token");
+    if (decoded is Map) {
+      return decoded['error']
+          ?.toString() ??
+          decoded['message']
+              ?.toString() ??
+          'Error inesperado';
+    }
+  } catch (_) {
+    // La respuesta no contiene JSON válido.
+  }
+
+  return 'Error inesperado '
+      '(${response.statusCode})';
+}
+
+Future<void>
+getCatalogoAdminApi({
+  required ProveedorController
+  proveedorController,
+
+  String? buscar,
+  int? idProveedor,
+  String? tipoItem,
+  String? estado,
+  bool? disponible,
+  int pagina = 1,
+  int limite = 24,
+}) async {
+  proveedorController
+      .loadingCatalogoAdmin
+      .value = true;
+
+  proveedorController
+      .errorCatalogoAdmin
+      .value = '';
 
   try {
-    final response = await http.post(
+    final queryParameters =
+    <String, String>{
+      'pagina':
+      pagina.toString(),
+
+      'limite':
+      limite.toString(),
+    };
+
+    if (
+    buscar != null &&
+        buscar.trim().isNotEmpty
+    ) {
+      queryParameters['buscar'] =
+          buscar.trim();
+    }
+
+    if (idProveedor != null) {
+      queryParameters[
+      'id_proveedor'] =
+          idProveedor.toString();
+    }
+
+    if (
+    tipoItem != null &&
+        tipoItem.trim().isNotEmpty
+    ) {
+      queryParameters['tipo_item'] =
+          tipoItem.trim();
+    }
+
+    if (
+    estado != null &&
+        estado.trim().isNotEmpty
+    ) {
+      queryParameters['estado'] =
+          estado.trim();
+    }
+
+    if (disponible != null) {
+      queryParameters['disponible'] =
+          disponible.toString();
+    }
+
+    final uri = Uri.parse(
+      '${Global.baseUrl}'
+          'catalogo/admin',
+    ).replace(
+      queryParameters:
+      queryParameters,
+    );
+
+    final token =
+    GetStorage().read(
+      'token',
+    );
+
+    final response =
+    await http.get(
       uri,
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
+        'Content-Type':
+        'application/json',
+
+        'Authorization':
+        'Bearer $token',
       },
     );
 
-    if (response.statusCode == 200) {
-
+    if (
+    response.statusCode ==
+        200
+    ) {
       final data =
-      jsonDecode(response.body);
-
-      Get.snackbar(
-        "Crawler",
-        "Contenido obtenido (${data["caracteres"]} caracteres)",
+      jsonDecode(
+        response.body,
       );
 
-      return data;
+      if (data is! Map) {
+        throw Exception(
+          'La respuesta del catálogo '
+              'no es válida',
+        );
+      }
+
+      proveedorController
+          .setCatalogoAdmin(
+        data,
+      );
+
+      return;
+    }
+
+    if (
+    response.statusCode ==
+        401
+    ) {
+      controller.logOut();
+
+      throw Exception(
+        'Sesión expirada',
+      );
+    }
+
+    throw Exception(
+      _catalogApiErrorMessage(
+        response,
+      ),
+    );
+  } catch (error) {
+    final message =
+    error
+        .toString()
+        .replaceFirst(
+      'Exception: ',
+      '',
+    );
+
+    proveedorController
+        .errorCatalogoAdmin
+        .value = message;
+
+    rethrow;
+  } finally {
+    proveedorController
+        .loadingCatalogoAdmin
+        .value = false;
+  }
+}
+
+Future<int>
+iniciarSincronizacionCatalogoApi({
+  required ProveedorController
+  proveedorController,
+}) async {
+  proveedorController
+      .iniciandoSincronizacion
+      .value = true;
+
+  proveedorController
+      .errorSincronizacion
+      .value = '';
+
+  try {
+    final uri = Uri.parse(
+      '${Global.baseUrl}'
+          'catalogo/sync',
+    );
+
+    final token =
+    GetStorage().read(
+      'token',
+    );
+
+    final response =
+    await http.post(
+      uri,
+      headers: {
+        'Content-Type':
+        'application/json',
+
+        'Authorization':
+        'Bearer $token',
+      },
+    );
+
+    if (
+    response.statusCode ==
+        202
+    ) {
+      final data =
+      jsonDecode(
+        response.body,
+      );
+
+      final rawSync =
+      data['sincronizacion'];
+
+      if (rawSync is! Map) {
+        throw Exception(
+          'El servidor no devolvió '
+              'la sincronización creada',
+        );
+      }
+
+      final sync =
+      Map<String, dynamic>.from(
+        rawSync,
+      );
+
+      proveedorController
+          .setSincronizacionActual(
+        sync,
+      );
+
+      final id =
+      int.tryParse(
+        sync['id_sincronizacion']
+            .toString(),
+      );
+
+      if (id == null) {
+        throw Exception(
+          'El identificador de la '
+              'sincronización no es válido',
+        );
+      }
+
+      return id;
+    }
+
+    /*
+     * Ya hay una ejecución activa.
+     */
+    if (
+    response.statusCode ==
+        409
+    ) {
+      final data =
+      jsonDecode(
+        response.body,
+      );
+
+      final rawSync =
+      data['sincronizacion'];
+
+      if (rawSync is Map) {
+        proveedorController
+            .setSincronizacionActual(
+          rawSync,
+        );
+      }
+
+      throw Exception(
+        data['error'] ??
+            'Ya existe una '
+                'sincronización en curso',
+      );
+    }
+
+    if (
+    response.statusCode ==
+        401
+    ) {
+      controller.logOut();
+
+      throw Exception(
+        'Sesión expirada',
+      );
+    }
+
+    throw Exception(
+      _catalogApiErrorMessage(
+        response,
+      ),
+    );
+  } catch (error) {
+    final message =
+    error
+        .toString()
+        .replaceFirst(
+      'Exception: ',
+      '',
+    );
+
+    proveedorController
+        .errorSincronizacion
+        .value = message;
+
+    rethrow;
+  } finally {
+    proveedorController
+        .iniciandoSincronizacion
+        .value = false;
+  }
+}
+
+Future<Map<String, dynamic>>
+getSincronizacionCatalogoApi({
+  required int
+  idSincronizacion,
+
+  required ProveedorController
+  proveedorController,
+}) async {
+  proveedorController
+      .consultandoSincronizacion
+      .value = true;
+
+  try {
+    final uri = Uri.parse(
+      '${Global.baseUrl}'
+          'catalogo/sync/'
+          '$idSincronizacion',
+    );
+
+    final token =
+    GetStorage().read(
+      'token',
+    );
+
+    final response =
+    await http.get(
+      uri,
+      headers: {
+        'Content-Type':
+        'application/json',
+
+        'Authorization':
+        'Bearer $token',
+      },
+    );
+
+    if (
+    response.statusCode ==
+        200
+    ) {
+      final data =
+      jsonDecode(
+        response.body,
+      );
+
+      final rawSync =
+      data['sincronizacion'];
+
+      if (rawSync is! Map) {
+        throw Exception(
+          'La respuesta de la '
+              'sincronización no es válida',
+        );
+      }
+
+      final sync =
+      Map<String, dynamic>.from(
+        rawSync,
+      );
+
+      proveedorController
+          .setSincronizacionActual(
+        sync,
+      );
+
+      return sync;
+    }
+
+    if (
+    response.statusCode ==
+        401
+    ) {
+      controller.logOut();
+
+      throw Exception(
+        'Sesión expirada',
+      );
+    }
+
+    throw Exception(
+      _catalogApiErrorMessage(
+        response,
+      ),
+    );
+  } catch (error) {
+    proveedorController
+        .errorSincronizacion
+        .value = error
+        .toString()
+        .replaceFirst(
+      'Exception: ',
+      '',
+    );
+
+    rethrow;
+  } finally {
+    proveedorController
+        .consultandoSincronizacion
+        .value = false;
+  }
+}
+
+Future<void>
+getHistorialSincronizacionesApi({
+  required ProveedorController
+  proveedorController,
+
+  int limite = 20,
+}) async {
+  proveedorController
+      .cargandoHistorial
+      .value = true;
+
+  try {
+    final uri = Uri.parse(
+      '${Global.baseUrl}'
+          'catalogo/sync/history',
+    ).replace(
+      queryParameters: {
+        'limite':
+        limite.toString(),
+      },
+    );
+
+    final token =
+    GetStorage().read(
+      'token',
+    );
+
+    final response =
+    await http.get(
+      uri,
+      headers: {
+        'Content-Type':
+        'application/json',
+
+        'Authorization':
+        'Bearer $token',
+      },
+    );
+
+    if (
+    response.statusCode ==
+        200
+    ) {
+      final data =
+      jsonDecode(
+        response.body,
+      );
+
+      proveedorController
+          .setHistorialSincronizaciones(
+        data[
+        'sincronizaciones']
+        as List? ??
+            <dynamic>[],
+      );
+
+      /*
+       * La primera ejecución es la más
+       * reciente y se conserva como actual.
+       */
+      if (
+      proveedorController
+          .historialSincronizaciones
+          .isNotEmpty
+      ) {
+        proveedorController
+            .setSincronizacionActual(
+          proveedorController
+              .historialSincronizaciones
+              .first,
+        );
+      }
+
+      return;
+    }
+
+    if (
+    response.statusCode ==
+        401
+    ) {
+      controller.logOut();
+
+      throw Exception(
+        'Sesión expirada',
+      );
+    }
+
+    throw Exception(
+      _catalogApiErrorMessage(
+        response,
+      ),
+    );
+  } catch (error) {
+    proveedorController
+        .errorSincronizacion
+        .value = error
+        .toString()
+        .replaceFirst(
+      'Exception: ',
+      '',
+    );
+
+    rethrow;
+  } finally {
+    proveedorController
+        .cargandoHistorial
+        .value = false;
+  }
+}
+
+Future<void>
+cargarCatalogoAdminApi({
+  required ProveedorController
+  proveedorController,
+}) {
+  return getCatalogoAdminApi(
+    proveedorController: proveedorController,
+    buscar: proveedorController.busquedaCatalogo.value,
+    idProveedor: proveedorController.proveedorSeleccionadoId.value,
+    tipoItem: proveedorController.tipoItemSeleccionado.value,
+    estado: proveedorController.estadoCatalogo.value,
+    disponible: proveedorController.disponibilidadSeleccionada.value,
+    pagina: proveedorController.paginaCatalogo.value,
+    limite: proveedorController.limiteCatalogo.value,
+  );
+}
+
+Future<List<Map<String, dynamic>>> getLogsSincronizacionCatalogoApi({
+  required int idSincronizacion,
+  required ProveedorController proveedorController,
+}) async {
+  proveedorController.cargandoLogsSincronizacion.value = true;
+  proveedorController.errorLogsSincronizacion.value = '';
+
+  try {
+    final uri = Uri.parse('${Global.baseUrl}catalogo/sync/$idSincronizacion/logs');
+    final token = GetStorage().read('token');
+
+    final response = await http.get(uri, headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+
+    final data = response.body.isNotEmpty
+        ? jsonDecode(response.body)
+        : <String, dynamic>{};
+
+    if (response.statusCode == 200) {
+      final logs = data['logs'] is List
+          ? List<Map<String, dynamic>>.from(
+        (data['logs'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+      )
+          : <Map<String, dynamic>>[];
+
+      proveedorController.setLogsSincronizacion(logs);
+      return logs;
     }
 
     if (response.statusCode == 401) {
       controller.logOut();
-      return {};
+      throw Exception('Sesión expirada');
     }
 
-    if (response.statusCode == 400 || response.statusCode == 404) {
-      final data = jsonDecode(response.body);
-      throw Exception(data['error'] ?? 'Error crawler');
-    }
-
-    throw Exception('Error inesperado (${response.statusCode})');
-
-  } catch (e) {
-    print("ERROR AL OBTENER LA PÁGINA: $e");
+    throw Exception(
+      data is Map && data['error'] != null
+          ? data['error'].toString()
+          : 'No fue posible consultar el registro técnico',
+    );
+  } catch (error) {
+    proveedorController.errorLogsSincronizacion.value =
+        error.toString().replaceFirst('Exception: ', '');
     rethrow;
-  }
-
-}
-
-void closeLoader() {
-  if (Get.isDialogOpen == true) {
-    Get.back(closeOverlays: true);
+  } finally {
+    proveedorController.cargandoLogsSincronizacion.value = false;
   }
 }

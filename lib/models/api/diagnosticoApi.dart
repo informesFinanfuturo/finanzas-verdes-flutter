@@ -172,6 +172,7 @@ Future<Map> guardarSeleccionActivosDiagnosticoApi({
   required int idDiagnostico,
   required List<int> activosSeleccionados,
   required Map<String, dynamic> resumenSeleccionado,
+  required List<Map<String, dynamic>> alternativasSeleccionadas,
 }) async {
 
   final uri = Uri.parse(
@@ -193,6 +194,9 @@ Future<Map> guardarSeleccionActivosDiagnosticoApi({
       body: jsonEncode({
         "activos_seleccionados":
         activosSeleccionados,
+
+        "alternativas_seleccionadas":
+        alternativasSeleccionadas,
 
         "resumen_seleccionado":
         resumenSeleccionado,
@@ -271,4 +275,92 @@ Future<Map> guardarSeleccionActivosDiagnosticoApi({
 
     rethrow;
   }
+}
+
+Future<Map<String, dynamic>>
+getAlternativasActivoDiagnosticoApi({
+  required int idDiagnostico,
+  required int idActivo,
+}) async {
+
+  final uri = Uri.parse(
+    '${Global.baseUrl}'
+        'diagnostico/'
+        '$idDiagnostico/'
+        'activo/'
+        '$idActivo/'
+        'alternativas',
+  );
+
+  final token =
+  GetStorage().read("token");
+
+  try {
+
+    final response =
+    await http.get(
+      uri,
+      headers: {
+        'Content-Type':
+        'application/json',
+
+        'Authorization':
+        'Bearer $token',
+      },
+    );
+
+    Map<String, dynamic> data = {};
+
+    if (response.body.isNotEmpty) {
+      final decoded =
+      jsonDecode(response.body);
+
+      if (decoded
+      is Map<String, dynamic>) {
+        data = decoded;
+      }
+    }
+
+    if (response.statusCode == 200) {
+      return data;
+    }
+
+    if (response.statusCode == 401) {
+      controller.logOut();
+
+      throw Exception(
+        'La sesión ha expirado',
+      );
+    }
+
+    if (response.statusCode == 400) {
+      throw Exception(
+        data["error"] ??
+            'Los datos enviados no son válidos',
+      );
+    }
+
+    if (response.statusCode == 404) {
+      throw Exception(
+        data["error"] ??
+            'No se encontraron alternativas',
+      );
+    }
+
+    throw Exception(
+      data["error"] ??
+          'Error inesperado '
+              '(${response.statusCode})',
+    );
+
+  } catch (error) {
+
+    print(
+      'ERROR OBTENER ALTERNATIVAS '
+          'DEL ACTIVO: $error',
+    );
+
+    rethrow;
+  }
+
 }

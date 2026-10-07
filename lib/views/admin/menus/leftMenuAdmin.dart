@@ -10,236 +10,485 @@ class Leftmenuadmin extends StatefulWidget {
   const Leftmenuadmin({super.key});
 
   @override
-  State<Leftmenuadmin> createState() => _LeftmenuadminState();
+  State<Leftmenuadmin> createState() =>
+      _LeftmenuadminState();
 }
 
-class _LeftmenuadminState extends State<Leftmenuadmin> {
+class _LeftmenuadminState
+    extends State<Leftmenuadmin> {
+  bool isCollapsed = false;
 
-  final modules = [
-    {
-      "nombre": "Inicio",
-      "logo": Icons.home_filled,
-      "route": Adminroutes.home,
-      "inPage": [Adminroutes.home]
-    },
-    {
-      "nombre": "Usuarios",
-      "logo": Icons.person,
-      "route": Adminroutes.users,
-      "inPage": [
+  final List<_AdminMenuItem> modules = const [
+    _AdminMenuItem(
+      name: 'Inicio',
+      icon: Icons.home_rounded,
+      route: Adminroutes.home,
+      inPages: [
+        Adminroutes.home,
+      ],
+    ),
+    _AdminMenuItem(
+      name: 'Usuarios',
+      icon: Icons.people_rounded,
+      route: Adminroutes.users,
+      inPages: [
         Adminroutes.users,
         Adminroutes.newUser,
-        Adminroutes.editUser
-      ]
-    },
-    {
-      "nombre": "Roles",
-      "logo": Icons.admin_panel_settings,
-      "route": Adminroutes.rols,
-      "inPage": [
+        Adminroutes.editUser,
+      ],
+    ),
+    _AdminMenuItem(
+      name: 'Roles y permisos',
+      icon: Icons
+          .admin_panel_settings_rounded,
+      route: Adminroutes.rols,
+      inPages: [
         Adminroutes.rols,
-        Adminroutes.newRol,
-        Adminroutes.editRol,
-      ]
-    },
-    {
-      "nombre": "Permisos",
-      "logo": Icons.security,
-      "route": Adminroutes.permissions,
-      "inPage": [
-        Adminroutes.permissions,
-        Adminroutes.newPermission,
-        Adminroutes.editPermission
-      ]
-    },
-    {"nombre" : "Proveedores", "logo" : Icons.work, "route" : Adminroutes.homeProveedores, "inPage" : [Adminroutes.homeProveedores]},
+      ],
+    ),
+    _AdminMenuItem(
+      name: 'Proveedores y catálogo',
+      icon: Icons.inventory_2_rounded,
+      route: Adminroutes.homeProveedores,
+      inPages: [
+        Adminroutes.homeProveedores,
+      ],
+    ),
   ];
-
-  bool isCollapsed = false;
 
   @override
   Widget build(BuildContext context) {
-
-    if (MediaQuery.of(context).size.width < 800) {
-      return const SizedBox();
+    if (MediaQuery.sizeOf(context).width <
+        800) {
+      return const SizedBox.shrink();
     }
 
-    return Obx(() => AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      width: isCollapsed ? 80 : 300,
-      height: double.infinity,
-      color: Global.container,
-      child: Column(
-        children: [
-
-          /// HEADER
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: isCollapsed
-                  ? MainAxisAlignment.start
-                  : MainAxisAlignment.spaceBetween,
-              children: [
-                if (!isCollapsed)
-                  Image.asset(Images.logo, width: 30),
-
-                InkWell(
-                  onTap: () {
-                    setState(() => isCollapsed = !isCollapsed);
-                  },
-                  child: Icon(
-                    isCollapsed ? Icons.menu : Icons.menu_open,
-                    size: 30,
-                    color: Global.primary,
-                  ),
-                )
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          /// MENU PRINCIPAL
-          Expanded(
-            child: Column(
-              children: [
-
-                ...modules.map<Widget>((module) {
-                  final IconData logo = module["logo"] as IconData;
-                  final String nombre = module["nombre"] as String;
-                  final String route = module["route"] as String;
-
-                  final bool isSelected =
-                  (module["inPage"] as List).any(
-                          (item) => item == controller.Page);
-
-                  return Tooltip(
-                    message: nombre,
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: isCollapsed ? 8 : 16,
-                      ),
-
-                      leading: Icon(
-                        logo,
-                        color: isSelected
-                            ? Global.primary
-                            : Global.textSecondary,
-                      ),
-
-                      title: isCollapsed
-                          ? null
-                          : Text(
-                        nombre,
-                        style: TextStyle(
-                          color: isSelected
-                              ? Global.primary
-                              : Global.textSecondary,
-                        ),
-                      ),
-
-                      onTap: () => controller.setPage(route),
-                    ),
-                  );
-                }),
-
-                /// SECCION MÁS
-                if (!isCollapsed)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 15),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text("Más"),
-                    ),
-                  ),
-
-                const SizedBox(height: 5),
-
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                      horizontal: isCollapsed ? 8 : 16),
-                  leading: Icon(
-                    controller.isDark.value
-                        ? CupertinoIcons.sun_max_fill
-                        : CupertinoIcons.moon_fill,
-                  ),
-                  title:
-                  isCollapsed ? null : const Text("Cambiar tema"),
-                  subtitle: isCollapsed
-                      ? null
-                      : Text(controller.isDark.value
-                      ? 'Modo claro'
-                      : 'Modo oscuro'),
-                  onTap: controller.toggleTheme,
-                ),
-
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                      horizontal: isCollapsed ? 8 : 16),
-                  leading: const Icon(CupertinoIcons.info),
-                  title: isCollapsed ? null : const Text("Acerca de"),
-                ),
-
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                      horizontal: isCollapsed ? 8 : 16),
-                  leading: const Icon(CupertinoIcons.doc_text),
-                  title: isCollapsed ? null : const Text("Términos"),
-                ),
-
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                      horizontal: isCollapsed ? 8 : 16),
-                  leading: const Icon(CupertinoIcons.gear),
-                  title: isCollapsed
-                      ? null
-                      : const Text("Configuración"),
-                ),
-              ],
-            ),
-          ),
-
-          /// FOOTER USER
-          controller.User["nombre_usuario"] == null
-              ? const Padding(
-            padding: EdgeInsets.all(20),
-            child: CircularProgressIndicator(),
-          )
-              : ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.symmetric(
-                horizontal: isCollapsed ? 8 : 16),
-
-            leading:
-            const Icon(CupertinoIcons.person_alt_circle),
-
-            title: isCollapsed
-                ? null
-                : Text(controller.User["nombre_usuario"],
-                maxLines: 1),
-
-            subtitle: isCollapsed
-                ? null
-                : Text("Administrador", maxLines: 1),
-
-            trailing: isCollapsed
-                ? null // 🔥 evita error de ancho
-                : InkWell(
-              onTap: controller.logOut,
-              child: const Padding(
-                padding: EdgeInsets.all(8),
-                child:
-                Icon(Icons.logout_outlined),
+    return Obx(
+          () => AnimatedContainer(
+        duration:
+        const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+        width: isCollapsed ? 72 : 260,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          color: Global.bg,
+          border: Border(
+            right: BorderSide(
+              color: Global.text.withOpacity(
+                controller.isDark.value
+                    ? 0.10
+                    : 0.08,
               ),
             ),
-          )
+          ),
+        ),
+        child: Column(
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView(
+                padding:
+                const EdgeInsets.symmetric(
+                  horizontal: 10,
+                ),
+                children: [
+                  if (!isCollapsed) ...[
+                    _sectionTitle(
+                      'ADMINISTRACIÓN',
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  ...modules.map(
+                        (module) {
+                      final selected =
+                      module.inPages.contains(
+                        controller.Page,
+                      );
+
+                      return _menuItem(
+                        title: module.name,
+                        icon: module.icon,
+                        selected: selected,
+                        onTap: () =>
+                            controller.setPage(
+                              module.route,
+                            ),
+                      );
+                    },
+                  ),
+                  if (!isCollapsed) ...[
+                    const SizedBox(height: 22),
+                    _sectionTitle('MÁS'),
+                    const SizedBox(height: 6),
+                  ] else
+                    const SizedBox(height: 16),
+                  _menuItem(
+                    title: 'Cambiar tema',
+                    subtitle:
+                    controller.isDark.value
+                        ? 'Cambiar a modo claro'
+                        : 'Cambiar a modo oscuro',
+                    icon:
+                    controller.isDark.value
+                        ? CupertinoIcons
+                        .sun_max_fill
+                        : CupertinoIcons
+                        .moon_fill,
+                    onTap:
+                    controller.toggleTheme,
+                  ),
+                  _menuItem(
+                    title: 'Configuración',
+                    icon:
+                    CupertinoIcons.gear,
+                    onTap: () {
+                      controller.setPage(
+                        Adminroutes.more,
+                      );
+                    },
+                  ),
+                  _menuItem(
+                    title: 'Acerca de',
+                    icon: CupertinoIcons
+                        .info_circle,
+                    onTap: () {
+                      controller.setPage(
+                        Adminroutes.more,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            _buildUserFooter(),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return SizedBox(
+      height: 72,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+        ),
+        child: Row(
+          mainAxisAlignment: isCollapsed
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.spaceBetween,
+          children: [
+            if (!isCollapsed)
+              Image.asset(
+                Images.logo,
+                width: 34,
+                height: 34,
+                fit: BoxFit.contain,
+              ),
+            Tooltip(
+              message: isCollapsed
+                  ? 'Expandir menú'
+                  : 'Contraer menú',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      isCollapsed =
+                      !isCollapsed;
+                    });
+                  },
+                  borderRadius:
+                  BorderRadius.circular(
+                    10,
+                  ),
+                  child: SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: Center(
+                      child: AnimatedRotation(
+                        turns: isCollapsed
+                            ? 0.5
+                            : 0,
+                        duration:
+                        const Duration(
+                          milliseconds: 240,
+                        ),
+                        child: Icon(
+                          Icons.menu_open_rounded,
+                          color: Global.primary,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _menuItem({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+    String? subtitle,
+    bool selected = false,
+  }) {
+    final content = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius:
+        BorderRadius.circular(11),
+        child: AnimatedContainer(
+          duration:
+          const Duration(milliseconds: 180),
+          constraints: BoxConstraints(
+            minHeight:
+            subtitle == null ? 46 : 58,
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal:
+            isCollapsed ? 0 : 12,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? Global.primary.withOpacity(
+              controller.isDark.value
+                  ? 0.18
+                  : 0.10,
+            )
+                : Colors.transparent,
+            borderRadius:
+            BorderRadius.circular(11),
+          ),
+          child: Row(
+            mainAxisAlignment: isCollapsed
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                size: 21,
+                color: selected
+                    ? Global.primary
+                    : Global.textSecondary,
+              ),
+              if (!isCollapsed) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize:
+                    MainAxisSize.min,
+                    crossAxisAlignment:
+                    CrossAxisAlignment
+                        .start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow:
+                        TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: selected
+                              ? Global.primary
+                              : Global.text,
+                        ),
+                      ),
+                      if (subtitle !=
+                          null) ...[
+                        const SizedBox(
+                          height: 2,
+                        ),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow:
+                          TextOverflow
+                              .ellipsis,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: Global
+                                .textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Padding(
+      padding:
+      const EdgeInsets.only(bottom: 4),
+      child: Tooltip(
+        message:
+        isCollapsed ? title : '',
+        waitDuration:
+        const Duration(milliseconds: 450),
+        child: content,
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding:
+      const EdgeInsets.symmetric(
+        horizontal: 12,
+      ),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.1,
+          color: Global.textSecondary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserFooter() {
+    final name = controller
+        .User["nombre_usuario"]
+        ?.toString();
+
+    if (name == null || name.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      margin:
+      const EdgeInsets.symmetric(
+        horizontal: 10,
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal:
+        isCollapsed ? 0 : 10,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color:
+            Global.text.withOpacity(0.08),
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: isCollapsed
+            ? MainAxisAlignment.center
+            : MainAxisAlignment.start,
+        children: [
+          Tooltip(
+            message:
+            isCollapsed ? name : '',
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color:
+                Global.primary.withOpacity(
+                  0.10,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                CupertinoIcons.person_fill,
+                size: 19,
+                color: Global.primary,
+              ),
+            ),
+          ),
+          if (!isCollapsed) ...[
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow:
+                    TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight:
+                      FontWeight.w600,
+                      color: Global.text,
+                    ),
+                  ),
+                  Text(
+                    'Administrador',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color:
+                      Global.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Tooltip(
+              message: 'Cerrar sesión',
+              child: IconButton(
+                onPressed:
+                controller.logOut,
+                visualDensity:
+                VisualDensity.compact,
+                icon: Icon(
+                  Icons.logout_rounded,
+                  size: 20,
+                  color:
+                  Global.textSecondary,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
-    ));
+    );
   }
+}
+
+class _AdminMenuItem {
+  final String name;
+  final IconData icon;
+  final String route;
+  final List<String> inPages;
+
+  const _AdminMenuItem({
+    required this.name,
+    required this.icon,
+    required this.route,
+    required this.inPages,
+  });
 }

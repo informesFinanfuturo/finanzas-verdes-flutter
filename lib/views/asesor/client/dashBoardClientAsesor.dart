@@ -15,7 +15,6 @@ import 'package:finanzas_verdes/views/asesor/client/consumo/viewConsumosAsesor.d
 import 'package:finanzas_verdes/views/asesor/client/diagnostico/Viewdiagnosticosasesor.dart';
 import 'package:finanzas_verdes/views/asesor/client/mipyme/infoMipymeDashBoardAsesor.dart';
 import 'package:finanzas_verdes/views/asesor/client/plan_trabajo/ViewPlanTrabajosAsesor.dart';
-import 'package:finanzas_verdes/views/asesor/client/requerimiento/selectActivoAsesor.dart';
 import 'package:finanzas_verdes/views/asesor/client/visita/Viewvisitasclienteasesor.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -30,9 +29,7 @@ class Dashboardclientasesor extends StatefulWidget {
 }
 
 class _DashboardclientasesorState extends State<Dashboardclientasesor> {
-
-  final ClientController clientController =
-  Get.put(ClientController());
+  final ClientController clientController = Get.put(ClientController());
 
   late final PageController pageController;
   late final ScrollController tabScrollController;
@@ -55,29 +52,22 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
   void initState() {
     super.initState();
 
-    final savedIndex =
-        clientController.selectedClientSection.value;
+    final savedIndex = clientController.selectedClientSection.value;
 
     // Evita índices inválidos si en el futuro
     // cambia la cantidad de secciones.
-    if (savedIndex >= 0 &&
-        savedIndex < clientSections.length) {
+    if (savedIndex >= 0 && savedIndex < clientSections.length) {
       selectedClientPage = savedIndex;
     } else {
       selectedClientPage = 0;
     }
 
     // Se crea después de recuperar el índice.
-    pageController = PageController(
-      initialPage: selectedClientPage,
-    );
+    pageController = PageController(initialPage: selectedClientPage);
 
     tabScrollController = ScrollController();
 
-    tabKeys = List.generate(
-      clientSections.length,
-          (_) => GlobalKey(),
-    );
+    tabKeys = List.generate(clientSections.length, (_) => GlobalKey());
 
     // Hace visible el botón seleccionado.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -137,7 +127,6 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-
         final isDesktop = constraints.maxWidth > 800;
         final cardWidth = isDesktop
             ? (constraints.maxWidth / 2) - 30
@@ -211,9 +200,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
               else
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: _buildMobileClientHeader(
-                    kpiCards: kpiCards,
-                  ),
+                  child: _buildMobileClientHeader(kpiCards: kpiCards),
                 ),
 
               const SizedBox(height: 8),
@@ -237,9 +224,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                     ClientInformationSection(
                       mipyme: clientController.Client["mipyme"] ?? {},
                       onEdit: () {
-                        controller.setPage(
-                          AsesorRoutes.editMipyme,
-                        );
+                        controller.setPage(AsesorRoutes.editMipyme);
                       },
                     ),
                     Viewfacturasasesor(
@@ -249,9 +234,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                       onCreateInvoice: () {
                         clientController.setConsumo({});
 
-                        controller.setPage(
-                          AsesorRoutes.editConsumo,
-                        );
+                        controller.setPage(AsesorRoutes.editConsumo);
                       },
                       onOpenInvoice: (factura) async {
                         final consumo = await getConsumoApi(
@@ -260,9 +243,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
 
                         clientController.setConsumo(consumo);
 
-                        controller.setPage(
-                          AsesorRoutes.editConsumo,
-                        );
+                        controller.setPage(AsesorRoutes.editConsumo);
                       },
                     ),
                     Viewactivosasesor(
@@ -270,9 +251,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                         clientController.Client["activos"] ?? [],
                       ),
                       onCreateAsset: () {
-                        controller.setPage(
-                          AsesorRoutes.newActivo,
-                        );
+                        controller.setPage(AsesorRoutes.newActivo);
                       },
                       onOpenAsset: (activo) async {
                         final assetDetail = await getActivoApi(
@@ -281,9 +260,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
 
                         clientController.setActivo(assetDetail);
 
-                        controller.setPage(
-                          AsesorRoutes.editActivo,
-                        );
+                        controller.setPage(AsesorRoutes.editActivo);
                       },
                     ),
                     Viewdiagnosticosasesor(
@@ -294,24 +271,18 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                       onCreateDiagnostic: () async {
                         final preview = await getClientFullImagesApi(
                           idUsuario:
-                          clientController.Client["user"]["id_usuario"],
+                              clientController.Client["user"]["id_usuario"],
                         );
 
                         clientController.setPreview(preview);
 
-                        controller.setPage(
-                          AsesorRoutes.newDiagnostico,
-                        );
+                        controller.setPage(AsesorRoutes.newDiagnostico);
                       },
 
                       onOpenDiagnostic: (diagnostico) async {
-                        clientController.setDiagnostico(
-                          diagnostico,
-                        );
+                        clientController.setDiagnostico(diagnostico);
 
-                        controller.setPage(
-                          AsesorRoutes.viewDiagnostico,
-                        );
+                        controller.setPage(AsesorRoutes.viewDiagnostico);
                       },
                     ),
                     Viewplanestrabajosasesor(
@@ -320,25 +291,19 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                       ),
 
                       onCreatePlan: () async {
-                        controller.setPage(
-                          AsesorRoutes.newPlanTrabajo,
-                        );
+                        controller.setPage(AsesorRoutes.newPlanTrabajo);
                       },
 
                       onOpenPlan: (plan) async {
                         clientController.setPlanTrabajo(plan);
 
-                        controller.setPage(
-                          AsesorRoutes.viewPlanTrabajo,
-                        );
+                        controller.setPage(AsesorRoutes.viewPlanTrabajo);
                       },
 
                       onEditPlan: (plan) async {
                         clientController.setPlanTrabajo(plan);
 
-                        controller.setPage(
-                          AsesorRoutes.editPlanTrabajo,
-                        );
+                        controller.setPage(AsesorRoutes.editPlanTrabajo);
                       },
                     ),
                     Viewvisitasclienteasesor(
@@ -347,33 +312,25 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                       ),
 
                       onCreateVisit: () async {
-                        await mostrarModalCrearCalendario(
-                          context,
-                          {
-                            'nombre_usuario':
-                            clientController.Client["user"]
-                            ["nombre_usuario"],
+                        await mostrarModalCrearCalendario(context, {
+                          'nombre_usuario':
+                              clientController.Client["user"]["nombre_usuario"],
 
-                            'nombre_mipyme':
-                            clientController.Client["mipyme"]
-                            ["nombre_mipyme"],
+                          'nombre_mipyme': clientController
+                              .Client["mipyme"]["nombre_mipyme"],
 
-                            'email':
-                            clientController.Client["user"]["email"],
+                          'email': clientController.Client["user"]["email"],
 
-                            'id_usuario':
-                            clientController.Client["user"]
-                            ["id_usuario"],
-                          },
-                          'Visita de seguimiento',
-                        );
+                          'id_usuario':
+                              clientController.Client["user"]["id_usuario"],
+                        }, 'Visita de seguimiento');
 
                         await clientController.refreshClient();
                       },
                     ),
                   ],
                 ),
-              )
+              ),
             ],
           );
         });
@@ -390,15 +347,9 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
             message: 'Volver a clientes',
             child: IconButton(
               onPressed: () => controller.backPage(),
-              icon: const Icon(
-                CupertinoIcons.back,
-                size: 24,
-              ),
+              icon: const Icon(CupertinoIcons.back, size: 24),
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(
-                minWidth: 44,
-                minHeight: 44,
-              ),
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               splashRadius: 22,
             ),
           ),
@@ -423,22 +374,17 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
     );
   }
 
-  Widget _buildMobileClientHeader({
-    required List<Widget> kpiCards,
-  }) {
+  Widget _buildMobileClientHeader({required List<Widget> kpiCards}) {
     final mipyme = clientController.client["mipyme"] ?? {};
 
-    final String nombre =
-        mipyme["nombre_mipyme"] ?? "Empresa desconocida";
+    final String nombre = mipyme["nombre_mipyme"] ?? "Empresa desconocida";
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: Global.container,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Global.text.withOpacity(0.08),
-        ),
+        border: Border.all(color: Global.text.withOpacity(0.08)),
       ),
       clipBehavior: Clip.antiAlias,
       child: AnimatedSize(
@@ -456,9 +402,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                 child: SizedBox(
                   height: 50,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Row(
                       children: [
                         Container(
@@ -517,10 +461,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
 
             // Información que desaparece al contraer.
             if (_headerExpanded) ...[
-              Divider(
-                height: 1,
-                color: Global.text.withOpacity(0.08),
-              ),
+              Divider(height: 1, color: Global.text.withOpacity(0.08)),
 
               Padding(
                 padding: const EdgeInsets.all(12),
@@ -548,7 +489,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                         Expanded(
                           child: Text(
                             '${mipyme["municipio"] ?? "Sin municipio"}, '
-                                '${mipyme["departamento"] ?? "Sin departamento"}',
+                            '${mipyme["departamento"] ?? "Sin departamento"}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
@@ -571,9 +512,9 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             for (
-                            int index = 0;
-                            index < kpiCards.length;
-                            index++
+                              int index = 0;
+                              index < kpiCards.length;
+                              index++
                             ) ...[
                               kpiCards[index],
                               if (index < kpiCards.length - 1)
@@ -686,16 +627,12 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
             const SizedBox(width: 14),
 
             ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: 180,
-                maxWidth: 350,
-              ),
+              constraints: const BoxConstraints(minWidth: 180, maxWidth: 350),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    mipyme["nombre_mipyme"] ??
-                        "Nombre de empresa desconocido",
+                    mipyme["nombre_mipyme"] ?? "Nombre de empresa desconocido",
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
@@ -713,7 +650,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                   ),
                   Text(
                     '${mipyme["municipio"] ?? "Sin municipio"}, '
-                        '${mipyme["departamento"] ?? "Sin departamento"}',
+                    '${mipyme["departamento"] ?? "Sin departamento"}',
                     style: GoogleFonts.poppins(
                       fontSize: 15,
                       color: Global.text.withOpacity(0.6),
@@ -725,11 +662,7 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
           ],
         ),
 
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: kpiCards,
-        ),
+        Wrap(spacing: 10, runSpacing: 10, children: kpiCards),
       ],
     );
   }
@@ -741,17 +674,13 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
         controller: tabScrollController,
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 5,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         itemCount: clientSections.length,
         separatorBuilder: (_, __) {
           return const SizedBox(width: 8);
         },
         itemBuilder: (context, index) {
-          final bool isSelected =
-              selectedClientPage == index;
+          final bool isSelected = selectedClientPage == index;
 
           return InkWell(
             key: tabKeys[index],
@@ -759,14 +688,9 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
             borderRadius: BorderRadius.circular(20),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? Global.primary
-                    : Global.container,
+                color: isSelected ? Global.primary : Global.container,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected
@@ -779,12 +703,8 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                   clientSections[index],
                   style: GoogleFonts.poppins(
                     fontSize: 13,
-                    fontWeight: isSelected
-                        ? FontWeight.w600
-                        : FontWeight.w400,
-                    color: isSelected
-                        ? Colors.white
-                        : Global.text,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected ? Colors.white : Global.text,
                   ),
                 ),
               ),
@@ -794,7 +714,6 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
       ),
     );
   }
-
 }
 
 class KpiCard extends StatefulWidget {
@@ -836,8 +755,7 @@ class _KpiCardState extends State<KpiCard> {
   @override
   Widget build(BuildContext context) {
     // En escritorio siempre muestra toda la información.
-    final bool showInformation =
-        widget.isDesktop || isExpanded;
+    final bool showInformation = widget.isDesktop || isExpanded;
 
     final double cardWidth = widget.isDesktop
         ? 240
@@ -848,9 +766,7 @@ class _KpiCardState extends State<KpiCard> {
     final double cardHeight = widget.isDesktop ? 100 : 60;
 
     return Tooltip(
-      message: showInformation
-          ? ''
-          : '${widget.title}: ${widget.value}',
+      message: showInformation ? '' : '${widget.title}: ${widget.value}',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -861,9 +777,7 @@ class _KpiCardState extends State<KpiCard> {
             curve: Curves.easeInOut,
             width: cardWidth,
             height: cardHeight,
-            padding: EdgeInsets.all(
-              showInformation ? 8 : 6,
-            ),
+            padding: EdgeInsets.all(showInformation ? 8 : 6),
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: Global.container,
@@ -892,11 +806,7 @@ class _KpiCardState extends State<KpiCard> {
                     color: widget.iconColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    widget.icon,
-                    size: 30,
-                    color: widget.iconColor,
-                  ),
+                  child: Icon(widget.icon, size: 30, color: widget.iconColor),
                 ),
 
                 if (showInformation) ...[
@@ -926,8 +836,7 @@ class _KpiCardState extends State<KpiCard> {
                             child: Text(
                               widget.value,
                               style: GoogleFonts.poppins(
-                                fontSize:
-                                widget.isDesktop ? 21 : 17,
+                                fontSize: widget.isDesktop ? 21 : 17,
                                 fontWeight: FontWeight.w700,
                                 color: Global.text,
                               ),
@@ -967,19 +876,14 @@ Widget _row(String label, dynamic value) {
       children: [
         Text(
           "$label ",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Global.text,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Global.text),
         ),
         Expanded(
           child: Text(
             value != null && value.toString().isNotEmpty
                 ? value.toString()
                 : "No registrado",
-            style: TextStyle(
-              color: Global.text.withOpacity(0.7),
-            ),
+            style: TextStyle(color: Global.text.withOpacity(0.7)),
           ),
         ),
       ],
@@ -995,24 +899,18 @@ Widget _rowArea(String label, dynamic value) {
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Global.text,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Global.text),
         ),
 
         const SizedBox(height: 4),
 
         Text(
-          value != null &&
-              value.toString().trim().isNotEmpty
+          value != null && value.toString().trim().isNotEmpty
               ? value.toString()
               : "No registrado",
           maxLines: 4,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: Global.text.withOpacity(0.7),
-          ),
+          style: TextStyle(color: Global.text.withOpacity(0.7)),
         ),
       ],
     ),
@@ -1027,19 +925,14 @@ Widget _rowMoney(String label, dynamic value) {
       children: [
         Text(
           "$label ",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Global.text,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Global.text),
         ),
         Expanded(
           child: Text(
             value != null && value.toString().isNotEmpty
                 ? "\$${Utils.formatMiles(value.toString())}"
                 : "No registrado",
-            style: TextStyle(
-              color: Global.text.withOpacity(0.7),
-            ),
+            style: TextStyle(color: Global.text.withOpacity(0.7)),
           ),
         ),
       ],

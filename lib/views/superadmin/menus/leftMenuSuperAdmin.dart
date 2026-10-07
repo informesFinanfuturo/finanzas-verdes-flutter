@@ -25,8 +25,17 @@ class _LeftmenusuperadminState extends State<Leftmenusuperadmin> {
       "inPage": [Adminroutes.home]
     },
     {"nombre" : "Usuarios", "logo" : Icons.person, "route" : Adminroutes.users, "inPage" : [Adminroutes.users, Adminroutes.newUser, Adminroutes.editUser]},
-    {"nombre" : "Roles", "logo" : Icons.admin_panel_settings, "route" : Adminroutes.rols, "inPage" : [Adminroutes.rols, Adminroutes.editRol, Adminroutes.newRol]},
-    {"nombre" : "Permisos", "logo" : Icons.security, "route" : Adminroutes.permissions, "inPage" : [Adminroutes.permissions, Adminroutes.newPermission, Adminroutes.editPermission]},
+    {
+      "nombre":
+      "Roles y permisos",
+      "logo":
+      Icons.admin_panel_settings,
+      "route":
+      Adminroutes.rols,
+      "inPage": [
+        Adminroutes.rols,
+      ],
+    },
     {"nombre" : "Clientes", "logo" : Icons.groups, "route" : AsesorRoutes.clients, "inPage" : [
       AsesorRoutes.clients,
       AsesorRoutes.newClient,
