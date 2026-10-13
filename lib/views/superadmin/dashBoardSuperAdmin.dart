@@ -1,6 +1,7 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/app/routes/subrutes/adminRoutes.dart';
+import 'package:finanzas_verdes/app/routes/subrutes/superadminRoutes.dart';
 import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/views/admin/menus/appBarAdmin.dart';
 import 'package:finanzas_verdes/views/admin/menus/bottomMenuAdmin.dart';
@@ -23,7 +24,7 @@ class _DashboardsuperadminState extends State<Dashboardsuperadmin> {
   void initState() {
     // TODO: implement initState
     super.initState();
-    controller.setPage(Adminroutes.home);
+    controller.resetNavigation(initialPage: SuperadminRoutes.home);
   }
   @override
   Widget build(BuildContext context) {

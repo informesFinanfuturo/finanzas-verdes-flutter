@@ -1,4 +1,3 @@
-// lib/app/middlewares/auth_middleware.dart
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 import 'package:finanzas_verdes/app/routes/routeNames.dart';
@@ -13,16 +12,14 @@ import 'package:finanzas_verdes/main.dart';
 //     //final isLoggedIn = generalController.isLoggedIn.value;
 //     //final isAdmin = generalController.isAdmin.value;
 //
-//     // 🚫 No logueado → login
 //     if (!isLoggedIn) {
 //       return const RouteSettings(name: Routes.login);
 //     }
 //
-//     // 🚫 No admin → fuera del dashboard admin
 //     if (route == Routes.dashboardAdmin && !isAdmin) {
 //       return const RouteSettings(name: Routes.login);
 //     }
 //
-//     return null; // ✅ deja pasar
+//     return null; // deja pasar
 //   }
 // }

@@ -28,9 +28,7 @@ class _DashboardasesorState
   void initState() {
     super.initState();
 
-    controller.setPage(
-      AsesorRoutes.home,
-    );
+    controller.resetNavigation(initialPage: AsesorRoutes.home);
   }
 
   @override

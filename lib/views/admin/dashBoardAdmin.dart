@@ -22,9 +22,7 @@ class _DashboardadminState
   void initState() {
     super.initState();
 
-    controller.setPage(
-      Adminroutes.home,
-    );
+    controller.resetNavigation(initialPage: Adminroutes.home);
   }
 
   @override

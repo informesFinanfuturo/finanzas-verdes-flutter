@@ -76,8 +76,8 @@ List<Widget> _actionButtons() => [
     title: 'Cerrar sesión',
     subtitle: 'Salir de la cuenta',
     color: Global.contrast,
-    onTap: () {
-      controller.logOut();
+    onTap: () async {
+      await controller.requestLogOut();
     },
   ),
 ];

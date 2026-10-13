@@ -20,7 +20,7 @@ class Global {
 
   static List<Map<String, dynamic>> itemConfig = [
 
-    /// ✅ ELECTRODOMÉSTICO GENERAL
+    // ELECTRODOMÉSTICO GENERAL
     {
       "tipo_item": "Electrodoméstico",
       "tiposProveedorPermitidos": ["Electrodomésticos"],
@@ -130,7 +130,7 @@ class Global {
       ]
     },
 
-    /// ✅ SERVICIO GENERAL
+    // SERVICIO GENERAL
     {
       "tipo_item": "Servicio",
       "tiposProveedorPermitidos": ["Servicios"],
@@ -151,7 +151,7 @@ class Global {
       ]
     },
 
-    /// ✅ INSTALACIÓN
+    // INSTALACIÓN
     {
       "tipo_item": "Instalación",
       "tiposProveedorPermitidos": ["Servicios"],

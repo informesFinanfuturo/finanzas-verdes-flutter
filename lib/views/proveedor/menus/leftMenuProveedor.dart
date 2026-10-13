@@ -191,7 +191,9 @@ class _LeftmenuproveedorState extends State<Leftmenuproveedor> {
             trailing: isCollapsed
                 ? null // ✅ CLAVE: evita el crash
                 : InkWell(
-              onTap: controller.logOut,
+              onTap: () async {
+                await controller.requestLogOut();
+              },
               child: const Padding(
                 padding: EdgeInsets.all(8),
                 child: Icon(Icons.logout_outlined),

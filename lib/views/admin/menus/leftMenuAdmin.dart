@@ -460,8 +460,9 @@ class _LeftmenuadminState
             Tooltip(
               message: 'Cerrar sesión',
               child: IconButton(
-                onPressed:
-                controller.logOut,
+                onPressed: () async {
+                  await controller.requestLogOut();
+                },
                 visualDensity:
                 VisualDensity.compact,
                 icon: Icon(

@@ -54,8 +54,10 @@ class Generalcontoller extends GetxController {
   // VARIABLES
   Timer? timer;
   final isDark = false.obs;
-  final page = "".obs;
-  final historyPages = [].obs;
+  final RxString page = ''.obs;
+  final RxList<String> historyPages = <String>[].obs;
+  bool _navigationInProgress = false;
+  static const int _maxHistoryLength = 40;
   final calendario = [].obs;
   final agenda = [].obs;
   final pages = {
@@ -128,85 +130,437 @@ class Generalcontoller extends GetxController {
     isDark.value = !isDark.value;
   }
 
-  void setPage(String item) {
-    if (page.value != item && page.value != "") {
-      historyPages.add(page.value);
+
+  Set<String> _allowedPagesForRole() {
+    final role = (
+        user["rol"]?["nombre_rol"] ?? ""
+    ).toString().trim().toLowerCase();
+
+    final adminRoutes = <String>{
+      Adminroutes.home,
+      Adminroutes.users,
+      Adminroutes.newUser,
+      Adminroutes.editUser,
+      Adminroutes.more,
+      Adminroutes.rols,
+      Adminroutes.homeProveedores,
+    };
+
+    final asesorRoutes = <String>{
+      AsesorRoutes.home,
+      AsesorRoutes.more,
+      AsesorRoutes.clients,
+      AsesorRoutes.newClient,
+      AsesorRoutes.newClientMipyme,
+      AsesorRoutes.editClient,
+      AsesorRoutes.dashBoardClient,
+      AsesorRoutes.editMipyme,
+      AsesorRoutes.newActivo,
+      AsesorRoutes.editActivo,
+      AsesorRoutes.editConsumo,
+      AsesorRoutes.newDiagnostico,
+      AsesorRoutes.viewDiagnostico,
+      AsesorRoutes.newPlanTrabajo,
+      AsesorRoutes.editPlanTrabajo,
+      AsesorRoutes.viewPlanTrabajo,
+    };
+
+    final clienteRoutes = <String>{
+      ClienteRoutes.home,
+      ClienteRoutes.more,
+      ClienteRoutes.activos,
+      ClienteRoutes.consumos,
+      ClienteRoutes.diagnosticos,
+    };
+
+    final proveedorRoutes = <String>{
+      ProveedorRoutes.home,
+      ProveedorRoutes.more,
+      ProveedorRoutes.catalogo,
+      ProveedorRoutes.newCatalogo,
+      ProveedorRoutes.editCatalogo,
+    };
+
+    switch (role) {
+      case "administrador":
+        return adminRoutes;
+
+      case "asesor":
+        return asesorRoutes;
+
+      case "cliente":
+        return clienteRoutes;
+
+      case "proveedor":
+        return proveedorRoutes;
+
+      case "super administrador":
+        return {
+          SuperadminRoutes.home,
+          ...adminRoutes,
+        };
+
+      default:
+        return {};
     }
-
-    page.value = item;
-
-    print("SET PAGE => $item");
-    print("HISTORY => $historyPages");
   }
 
-  Future<void> backPage() async {
-    if (hasUnsavedChanges.value) {
-      final salir = await Get.dialog<bool>(
-        AlertDialog(
-          title: const Text("Cambios sin guardar"),
-          content: const Text(
-            "Tienes cambios sin guardar. "
-            "¿Deseas salir de todas formas?",
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Get.back(result: false);
-              },
-              child: const Text("Continuar editando"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Get.back(result: true);
-              },
-              child: const Text("Salir"),
-            ),
-          ],
-        ),
-      );
 
-      if (salir != true) {
-        hasUnsavedChanges.value = false;
-        return;
-      }
+  bool _isValidInternalPage(String route) {
+    if (!pages.containsKey(route)) {
+      debugPrint(
+        "[NAV] Ruta inexistente: $route",
+      );
+      return false;
     }
 
-    if (historyPages.isEmpty) {
-      Get.back();
+    final allowed = _allowedPagesForRole();
+
+    if (!allowed.contains(route)) {
+      debugPrint(
+        "[NAV] Acceso no permitido a: $route",
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<bool> _confirmLeavePage() async {
+    if (!hasUnsavedChanges.value) {
+      return true;
+    }
+
+    final salir = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text(
+          "Cambios sin guardar",
+        ),
+        content: const Text(
+          "Tienes cambios sin guardar. "
+              "¿Deseas salir de todas formas?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back(result: false);
+            },
+            child: const Text(
+              "Continuar editando",
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back(result: true);
+            },
+            child: const Text(
+              "Salir",
+            ),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+
+    // Si cancela, no se modifica ningún estado.
+    if (salir != true) {
+      return false;
+    }
+
+    return true;
+  }
+
+  void _pushHistory(String route) {
+    if (route.isEmpty) {
       return;
     }
 
-    hasUnsavedChanges.value = false;
-    page.value = historyPages.value.removeLast();
+    if (!_isValidInternalPage(route)) {
+      return;
+    }
+
+    // Evitar páginas consecutivas duplicadas.
+    if (
+    historyPages.isNotEmpty &&
+        historyPages.last == route
+    ) {
+      return;
+    }
+
+    historyPages.add(route);
+
+    // Limitar memoria del historial.
+    if (historyPages.length > _maxHistoryLength) {
+      historyPages.removeAt(0);
+    }
   }
+
+  Future<bool> goToPage(
+      String route, {
+        bool addToHistory = true,
+      }) async {
+    if (_navigationInProgress) {
+      return false;
+    }
+
+    if (page.value == route) {
+      return true;
+    }
+
+    if (!_isValidInternalPage(route)) {
+      return false;
+    }
+
+    _navigationInProgress = true;
+
+    try {
+      final canLeave = await _confirmLeavePage();
+
+      if (!canLeave) {
+        return false;
+      }
+
+      final previousPage = page.value;
+
+      if (
+      addToHistory &&
+          previousPage.isNotEmpty
+      ) {
+        _pushHistory(previousPage);
+      }
+
+      hasUnsavedChanges.value = false;
+
+      page.value = route;
+
+      debugPrint(
+        "[NAV] $previousPage -> $route",
+      );
+
+      return true;
+    } finally {
+      _navigationInProgress = false;
+    }
+  }
+
+  // ============================================================
+  // COMPATIBILIDAD CON LLAMADAS EXISTENTES
+  // ============================================================
+
+  Future<bool> setPage(String route) {
+    return goToPage(route);
+  }
+
+  // ============================================================
+  // VOLVER A LA PÁGINA ANTERIOR
+  // ============================================================
+
+  Future<bool> backPage() async {
+    if (_navigationInProgress) {
+      return false;
+    }
+
+    _navigationInProgress = true;
+
+    try {
+      // No salir del dashboard desde su página raíz.
+      if (historyPages.isEmpty) {
+        debugPrint(
+          "[NAV] Sin historial interno disponible",
+        );
+        return false;
+      }
+
+      // Comprobar cambios pendientes.
+      final canLeave = await _confirmLeavePage();
+
+      if (!canLeave) {
+        return false;
+      }
+
+      // Descartar entradas inválidas o de otro rol.
+      while (historyPages.isNotEmpty) {
+        final previousPage = historyPages.removeLast();
+
+        if (!_isValidInternalPage(previousPage)) {
+          continue;
+        }
+
+        if (previousPage == page.value) {
+          continue;
+        }
+
+        hasUnsavedChanges.value = false;
+        page.value = previousPage;
+
+        debugPrint(
+          "[NAV] Regresando a $previousPage",
+        );
+
+        return true;
+      }
+
+      // No modificar la página actual.
+      return false;
+    } finally {
+      _navigationInProgress = false;
+    }
+  }
+
+  Future<bool> replacePage(String route) async {
+    return goToPage(
+      route,
+      addToHistory: false,
+    );
+  }
+
+  bool replacePageAfterSave(String route) {
+    if (_navigationInProgress) {
+      return false;
+    }
+
+    if (!_isValidInternalPage(route)) {
+      return false;
+    }
+
+    hasUnsavedChanges.value = false;
+    page.value = route;
+
+    return true;
+  }
+
+  void resetNavigation({
+    String? initialPage,
+  }) {
+    historyPages.clear();
+    hasUnsavedChanges.value = false;
+    _navigationInProgress = false;
+
+    if (
+    initialPage != null &&
+        _isValidInternalPage(initialPage)
+    ) {
+      page.value = initialPage;
+    } else {
+      page.value = "";
+    }
+  }
+
+  Future<bool> goHome(String route) async {
+    if (_navigationInProgress) {
+      return false;
+    }
+
+    if (!_isValidInternalPage(route)) {
+      return false;
+    }
+
+    _navigationInProgress = true;
+
+    try {
+      final canLeave = await _confirmLeavePage();
+
+      if (!canLeave) {
+        return false;
+      }
+
+      historyPages.clear();
+      hasUnsavedChanges.value = false;
+      page.value = route;
+
+      return true;
+    } finally {
+      _navigationInProgress = false;
+    }
+  }
+
 
   void setUser(Map item) {
     user.value = item;
   }
 
-  void redirectToAndSave(Map user) async {
+  Future<void> redirectToAndSave(
+      Map userData,
+      ) async {
     final box = GetStorage();
-    print(user);
-    box.write("user", user);
-    if (user["rol"]["nombre_rol"] == "Administrador") {
-      Get.toNamed(Routes.dashboardAdmin);
-    } else if (user["rol"]["nombre_rol"] == "Asesor") {
-      Get.toNamed(Routes.dashboardAsesor);
-    } else if (user["rol"]["nombre_rol"] == "Cliente") {
-      Get.toNamed(Routes.dashboardCliente);
-    } else if (user["rol"]["nombre_rol"] == "Proveedor") {
-      Get.toNamed(Routes.dashboardProveedor);
-    } else if (user["rol"]["nombre_rol"] == "Super administrador") {
-      Get.toNamed(Routes.dashboardSuperAdmin);
+
+    // Guardar la información del usuario.
+    await box.write("user", userData);
+
+    // Actualizar el usuario en memoria.
+    setUser(userData);
+
+    // Determinar la ruta por rol.
+    final role = (
+        userData["rol"]?["nombre_rol"] ?? ""
+    ).toString().trim().toLowerCase();
+
+    String? destination;
+
+    switch (role) {
+      case "administrador":
+        destination = Routes.dashboardAdmin;
+        break;
+
+      case "asesor":
+        destination = Routes.dashboardAsesor;
+        break;
+
+      case "cliente":
+        destination = Routes.dashboardCliente;
+        break;
+
+      case "proveedor":
+        destination = Routes.dashboardProveedor;
+        break;
+
+      case "super administrador":
+        destination = Routes.dashboardSuperAdmin;
+        break;
     }
+
+    if (destination == null) {
+      debugPrint(
+        "[AUTH] Rol no reconocido: $role",
+      );
+
+      Get.offAllNamed(Routes.login);
+      return;
+    }
+
+    resetNavigation();
+    Get.offAllNamed(destination);
   }
 
   void logOut() {
-    Get.offAllNamed(Routes.login);
-    controller.setUser({});
+    resetNavigation();
+    setUser({});
     final box = GetStorage();
-    box.write("user", null);
-    box.write("token", null);
+    box.remove("user");
+    box.remove("token");
+    Get.offAllNamed(Routes.login);
+  }
+
+  Future<bool> requestLogOut() async {
+    if (_navigationInProgress) {
+      return false;
+    }
+
+    _navigationInProgress = true;
+
+    try {
+      final canLeave = await _confirmLeavePage();
+
+      if (!canLeave) {
+        return false;
+      }
+    } finally {
+      _navigationInProgress = false;
+    }
+
+    logOut();
+
+    return true;
   }
 
   void initUser() {

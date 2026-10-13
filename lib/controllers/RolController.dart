@@ -1,64 +1,30 @@
 import 'package:get/get.dart';
 
 class RolController extends GetxController {
-  final RxList<dynamic> rols =
-      <dynamic>[].obs;
+  final RxList<dynamic> rols = <dynamic>[].obs;
+  final RxMap<String, dynamic> rol = <String, dynamic>{}.obs;
+  final RxMap<String, dynamic> summary = <String, dynamic>{}.obs;
 
-  final RxMap<String, dynamic> rol =
-      <String, dynamic>{}.obs;
+  final RxnInt selectedRoleId = RxnInt();
+  final RxSet<int> selectedPermissionIds = <int>{}.obs;
+  final RxSet<int> originalPermissionIds = <int>{}.obs;
 
-  final RxMap<String, dynamic> summary =
-      <String, dynamic>{}.obs;
+  final RxBool isLoading = false.obs;
+  final RxBool isSaving = false.obs;
 
-  final RxnInt selectedRoleId =
-  RxnInt();
-
-  final RxSet<int> selectedPermissionIds =
-      <int>{}.obs;
-
-  final RxSet<int> originalPermissionIds =
-      <int>{}.obs;
-
-  final RxBool isLoading =
-      false.obs;
-
-  final RxBool isSaving =
-      false.obs;
-
-  // =====================================
-  // ROLES
-  // =====================================
-
-  void setRols(
-      List<dynamic> items,
-      ) {
+  void setRols(List<dynamic> items,) {
     rols.assignAll(items);
 
-    /*
-     * Si ya había un rol seleccionado,
-     * intentamos conservarlo después
-     * de actualizar la información.
-     */
-    final currentRoleId =
-        selectedRoleId.value;
+    final currentRoleId = selectedRoleId.value;
 
     if (currentRoleId != null) {
-      final selected =
-      _findRoleById(
-        currentRoleId,
-      );
+      final selected = _findRoleById(currentRoleId,);
 
       if (selected != null) {
         selectRole(selected);
         return;
       }
     }
-
-    /*
-     * Si no había selección o el rol
-     * dejó de existir, seleccionamos
-     * el primer rol disponible.
-     */
     if (rols.isNotEmpty) {
       final firstRole =
           rols.first;
@@ -133,11 +99,6 @@ class RolController extends GetxController {
         continue;
       }
 
-      /*
-     * El backend actual utiliza "enabled".
-     * También dejamos soporte para "asignado"
-     * por compatibilidad futura.
-     */
       final bool assigned =
           _isAssigned(
             permission['enabled'],
@@ -180,9 +141,7 @@ class RolController extends GetxController {
     selectedPermissionIds.refresh();
   }
 
-  // =====================================
   // PERMISOS
-  // =====================================
 
   void togglePermission(
       int permissionId,
@@ -241,10 +200,6 @@ class RolController extends GetxController {
     selectedPermissionIds.refresh();
   }
 
-  /*
-   * Puedes llamarlo después de que
-   * el backend confirme el guardado.
-   */
   void confirmPermissionChanges() {
     originalPermissionIds.assignAll(
       selectedPermissionIds,
@@ -254,9 +209,7 @@ class RolController extends GetxController {
     selectedPermissionIds.refresh();
   }
 
-  // =====================================
   // ESTADOS DE CARGA
-  // =====================================
 
   void setLoading(
       bool value,
@@ -272,9 +225,7 @@ class RolController extends GetxController {
         value;
   }
 
-  // =====================================
   // BÚSQUEDAS
-  // =====================================
 
   Map<String, dynamic>?
   _findRoleById(
@@ -300,9 +251,7 @@ class RolController extends GetxController {
     return null;
   }
 
-  // =====================================
   // CONVERSIONES
-  // =====================================
 
   int? _toInt(
       dynamic value,
@@ -344,9 +293,7 @@ class RolController extends GetxController {
         normalized == 'sí';
   }
 
-  // =====================================
   // CAMBIOS PENDIENTES
-  // =====================================
 
   bool get hasPermissionChanges {
     if (
@@ -378,16 +325,7 @@ class RolController extends GetxController {
         .length;
   }
 
-  // =====================================
-  // COMPATIBILIDAD CON LA VISTA
-  // =====================================
-
-  List<dynamic> get Rols =>
-      rols;
-
-  Map<String, dynamic> get Rol =>
-      rol;
-
-  Map<String, dynamic> get Summary =>
-      summary;
+  List<dynamic> get Rols => rols;
+  Map<String, dynamic> get Rol => rol;
+  Map<String, dynamic> get Summary => summary;
 }

@@ -390,7 +390,9 @@ class _LeftmenuasesorState extends State<Leftmenuasesor> {
             Tooltip(
               message: "Cerrar sesión",
               child: IconButton(
-                onPressed: controller.logOut,
+                onPressed: () async {
+                  await controller.requestLogOut();
+                },
                 visualDensity: VisualDensity.compact,
                 icon: Icon(
                   Icons.logout_rounded,

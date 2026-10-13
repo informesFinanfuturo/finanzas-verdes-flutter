@@ -26,9 +26,7 @@ class _DashboardclienteState
   void initState() {
     super.initState();
 
-    controller.setPage(
-      ClienteRoutes.home,
-    );
+    controller.resetNavigation(initialPage: ClienteRoutes.home);
   }
 
   @override

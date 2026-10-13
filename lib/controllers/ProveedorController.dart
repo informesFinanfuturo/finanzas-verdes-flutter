@@ -3,43 +3,26 @@ import 'package:get/get.dart';
 class ProveedorController extends GetxController {
 
   final RxList<dynamic>tiposProveedores = <dynamic>[].obs;
-
   final RxList<dynamic>catalogo = <dynamic>[].obs;
-
   final RxMap<String, dynamic>item = <String, dynamic>{}.obs;
 
   final RxBool loading = false.obs;
 
   final RxMap<String, dynamic>catalogoAdmin = <String, dynamic>{}.obs;
-
   final RxList<Map<String, dynamic>>productosAdmin = <Map<String, dynamic>>[].obs;
-
   final RxMap<String, dynamic>resumenCatalogoAdmin = <String, dynamic>{}.obs;
-
   final RxMap<String, dynamic>paginacionCatalogoAdmin = <String, dynamic>{}.obs;
-
   final RxBool loadingCatalogoAdmin = false.obs;
-
   final RxString errorCatalogoAdmin = ''.obs;
 
-  final RxList<Map<String, dynamic>> proveedoresAdmin =
-      <Map<String, dynamic>>[].obs;
-
-  final RxMap<String, dynamic> resumenProveedoresAdmin =
-      <String, dynamic>{}.obs;
-
-  final RxMap<String, dynamic> paginacionProveedoresAdmin =
-      <String, dynamic>{}.obs;
-
-  final RxMap<String, dynamic> proveedorDetalle =
-      <String, dynamic>{}.obs;
+  final RxList<Map<String, dynamic>> proveedoresAdmin = <Map<String, dynamic>>[].obs;
+  final RxMap<String, dynamic> resumenProveedoresAdmin = <String, dynamic>{}.obs;
+  final RxMap<String, dynamic> paginacionProveedoresAdmin = <String, dynamic>{}.obs;
+  final RxMap<String, dynamic> proveedorDetalle = <String, dynamic>{}.obs;
 
   final RxBool loadingProveedoresAdmin = false.obs;
   final RxString errorProveedoresAdmin = ''.obs;
 
-/*
- * Filtros del listado de proveedores.
- */
   final RxString busquedaProveedor = ''.obs;
   final RxString estadoProveedorFiltro = ''.obs;
   final RxString origenProveedorFiltro = ''.obs;
@@ -48,35 +31,15 @@ class ProveedorController extends GetxController {
   final RxInt paginaProveedores = 1.obs;
   final RxInt limiteProveedores = 20.obs;
 
-  /*
-   * Filtros administrativos.
-   */
-  final RxString
-  busquedaCatalogo =
-      ''.obs;
+  final RxString busquedaCatalogo = ''.obs;
+  final RxnInt proveedorSeleccionadoId = RxnInt();
+  final RxString tipoItemSeleccionado = ''.obs;
 
-  final RxnInt
-  proveedorSeleccionadoId =
-  RxnInt();
+  final RxString estadoCatalogo = ''.obs;
+  final RxnBool disponibilidadSeleccionada = RxnBool();
+  final RxInt paginaCatalogo = 1.obs;
 
-  final RxString
-  tipoItemSeleccionado =
-      ''.obs;
-
-  final RxString
-  estadoCatalogo =
-      ''.obs;
-
-  final RxnBool
-  disponibilidadSeleccionada =
-  RxnBool();
-
-  final RxInt paginaCatalogo =
-      1.obs;
-
-  final RxInt limiteCatalogo =
-      24.obs;
-
+  final RxInt limiteCatalogo = 24.obs;
   final RxMap<String, dynamic> sincronizacionActual = <String, dynamic>{}.obs;
   final RxList<Map<String, dynamic>> historialSincronizaciones = <Map<String, dynamic>>[].obs;
 
@@ -89,29 +52,19 @@ class ProveedorController extends GetxController {
   final RxString errorSincronizacion = ''.obs;
   final RxString errorLogsSincronizacion = ''.obs;
 
-  /*
-   * Métodos conservados para compatibilidad
-   * con las pantallas actuales.
-   */
-  void setTiposProveedores(
-      List<dynamic> values,
-      ) {
+  void setTiposProveedores(List<dynamic> values,) {
     tiposProveedores.assignAll(
       values,
     );
   }
 
-  void setCatalogo(
-      List<dynamic> values,
-      ) {
+  void setCatalogo(List<dynamic> values,) {
     catalogo.assignAll(
       values,
     );
   }
 
-  void setCatalogoAdmin(
-      Map<dynamic, dynamic> value,
-      ) {
+  void setCatalogoAdmin(Map<dynamic, dynamic> value,) {
     final normalized =
     Map<String, dynamic>.from(
       value,
@@ -213,28 +166,16 @@ class ProveedorController extends GetxController {
   }
 
   void limpiarErrorSincronizacion() {
-    errorSincronizacion.value =
-    '';
+    errorSincronizacion.value = '';
   }
 
   void limpiarFiltrosCatalogo() {
-    busquedaCatalogo.value =
-    '';
-
-    proveedorSeleccionadoId.value =
-    null;
-
-    tipoItemSeleccionado.value =
-    '';
-
-    estadoCatalogo.value =
-    '';
-
-    disponibilidadSeleccionada.value =
-    null;
-
-    paginaCatalogo.value =
-    1;
+    busquedaCatalogo.value = '';
+    proveedorSeleccionadoId.value = null;
+    tipoItemSeleccionado.value = '';
+    estadoCatalogo.value = '';
+    disponibilidadSeleccionada.value = null;
+    paginaCatalogo.value = 1;
   }
 
   void setPaginaCatalogo(

@@ -233,6 +233,15 @@ Future<Map<String, dynamic>> getConsumoApi({
       throw Exception(data['error'] ?? 'Error al obtener consumo');
     }
 
+    if (response.statusCode == 403) {
+      final data = jsonDecode(response.body);
+
+      throw Exception(
+        data['error'] ??
+            'No tienes autorización para consultar esta factura.',
+      );
+    }
+
     throw Exception('Error inesperado (${response.statusCode})');
 
   } catch (e) {

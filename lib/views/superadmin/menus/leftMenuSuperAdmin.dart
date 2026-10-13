@@ -230,7 +230,9 @@ class _LeftmenusuperadminState extends State<Leftmenusuperadmin> {
             trailing: isCollapsed
                 ? null
                 : InkWell(
-              onTap: controller.logOut,
+              onTap: () async {
+                await controller.requestLogOut();
+              },
               child: const Padding(
                 padding: EdgeInsets.all(8),
                 child:

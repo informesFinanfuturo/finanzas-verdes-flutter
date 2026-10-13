@@ -54,7 +54,7 @@ Future<Map> createActivoApi({
     }
 
     if (response.statusCode == 401) {
-      controller.logOut();
+      await controller.requestLogOut();
       return {};
     }
 

@@ -33,7 +33,7 @@ class _DashboardproveedorState extends State<Dashboardproveedor> {
   void initState() {
     // TODO: implement initState
     super.initState();
-    controller.setPage(ProveedorRoutes.home);
+    controller.resetNavigation(initialPage: ProveedorRoutes.home);
   }
   @override
   Widget build(BuildContext context) {

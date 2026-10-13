@@ -281,12 +281,9 @@ class _EdituseradminState
     return Row(
       children: [
         IconButton(
-          tooltip:
-          'Volver',
-          onPressed: () {
-            controller.setPage(
-              Adminroutes.users,
-            );
+          tooltip: 'Volver',
+          onPressed: () async {
+            await controller.backPage();
           },
           icon:
           const Icon(
