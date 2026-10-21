@@ -145,36 +145,40 @@ class _HomeadminState extends State<Homeadmin> {
     ).toList();
   }
 
-  Map<String, int>
-  get _usersByRole {
-    final result = <String, int>{};
 
-    for (final user in _users) {
-      final role =
-      user["nombre_rol"]
-          ?.toString()
-          .trim();
+  Map<String, int> get _usersByRole {
+    final raw =
+    userController.Summary['por_rol'];
 
-      final key =
-      role == null || role.isEmpty
-          ? 'Sin rol'
-          : role;
-
-      result[key] =
-          (result[key] ?? 0) + 1;
+    if (raw is! Map) {
+      return <String, int>{};
     }
 
-    final entries =
-    result.entries.toList()
-      ..sort(
-            (a, b) =>
-            b.value.compareTo(
-              a.value,
-            ),
-      );
+    final valores =
+    <MapEntry<String, int>>[];
+
+    raw.forEach((key, value) {
+      final cantidad = int.tryParse(
+        value.toString(),
+      ) ??
+          0;
+
+      if (cantidad > 0) {
+        valores.add(
+          MapEntry(
+            key.toString(),
+            cantidad,
+          ),
+        );
+      }
+    });
+
+    valores.sort(
+          (a, b) => b.value.compareTo(a.value),
+    );
 
     return Map<String, int>.fromEntries(
-      entries,
+      valores,
     );
   }
 

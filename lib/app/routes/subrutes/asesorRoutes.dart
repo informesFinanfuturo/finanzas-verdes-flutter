@@ -14,7 +14,9 @@ class AsesorRoutes {
   static const editConsumo = 'editConsumoAsesor';
   static const newDiagnostico = 'newDiagnosticoAsesor';
   static const viewDiagnostico = 'viewDiagnosticoAsesor';
+  static const procesoFve = 'procesoFveAsesor';
   static const newPlanTrabajo = 'newPlanTrabajoAsesor';
   static const editPlanTrabajo = 'editPlanTrabajoAsesor';
   static const viewPlanTrabajo = 'viewPlanTrabajoAsesor';
+  static const visitaAmbiental = 'visitaAmbientalAsesor';
 }

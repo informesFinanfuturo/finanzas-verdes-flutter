@@ -49,6 +49,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
+import 'package:finanzas_verdes/views/asesor/client/fve/procesoFveAsesor.dart';
 
 class Generalcontoller extends GetxController {
   // VARIABLES
@@ -87,6 +88,7 @@ class Generalcontoller extends GetxController {
     AsesorRoutes.newPlanTrabajo: Newplantrabajoasesor(),
     AsesorRoutes.editPlanTrabajo: Editplantrabajoasesor(),
     AsesorRoutes.viewPlanTrabajo: Viewplantrabajoasesor(),
+    AsesorRoutes.procesoFve: Procesofveasesor(),
 
     // CLIENTE
     ClienteRoutes.home: Homecliente(),
@@ -160,6 +162,7 @@ class Generalcontoller extends GetxController {
       AsesorRoutes.editConsumo,
       AsesorRoutes.newDiagnostico,
       AsesorRoutes.viewDiagnostico,
+      AsesorRoutes.procesoFve,
       AsesorRoutes.newPlanTrabajo,
       AsesorRoutes.editPlanTrabajo,
       AsesorRoutes.viewPlanTrabajo,

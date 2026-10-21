@@ -5,18 +5,128 @@ import 'package:finanzas_verdes/main.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 
+
 Map<String, dynamic> _decodeMap(http.Response response) {
-  if (response.body.trim().isEmpty) {
-    return {};
+  final contentType =
+  (response.headers['content-type'] ?? '').toLowerCase();
+
+  final body = response.body.trim();
+
+  final esJson =
+      contentType.contains('application/json') ||
+          contentType.contains('+json');
+
+  if (!esJson) {
+    if (response.statusCode == 404) {
+      throw Exception(
+          'El servicio de consulta corporativa todavía '
+              'no está disponible en el servidor.'
+      );
+    }
+
+    throw Exception(
+        'El servidor devolvió una respuesta inesperada '
+            '(HTTP ${response.statusCode}).'
+    );
   }
 
-  final decoded = jsonDecode(response.body);
-
-  if (decoded is Map<String, dynamic>) {
-    return decoded;
+  if (body.isEmpty) {
+    throw Exception(
+        'El servidor devolvió una respuesta vacía.'
+    );
   }
 
-  return {};
+  try {
+    final decoded = jsonDecode(body);
+
+    if (decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+
+    throw Exception(
+        'La respuesta del servidor no tiene '
+            'el formato esperado.'
+    );
+  } on FormatException {
+    throw Exception(
+        'El servidor devolvió información JSON inválida.'
+    );
+  }
+}
+
+
+Future<Map<String, dynamic>> listarProspectosManualApi({
+  int page = 1,
+  int limit = 10,
+  String search = '',
+  String estado = '',
+}) async {
+  final uri = Uri.parse('${Global.baseUrl}prospecto').replace(
+    queryParameters: {
+      'page': '$page',
+      'limit': '$limit',
+      if (search.isNotEmpty) 'search': search,
+      if (estado.isNotEmpty) 'estado': estado,
+    },
+  );
+
+  final token = GetStorage().read('token');
+
+  final response = await http.get(
+    uri,
+    headers: {
+      'Authorization': 'Bearer $token',
+    },
+  );
+
+  if (response.statusCode == 401) {
+    controller.logOut();
+    throw Exception('Sesión expirada');
+  }
+
+  final data = _decodeMap(response);
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      data['error'] ?? 'No fue posible listar prospectos',
+    );
+  }
+
+  return data;
+}
+
+Future<Map<String, dynamic>> registrarProspectoManualApi({
+  required Map<String, String> datos,
+}) async {
+  final uri = Uri.parse(
+    '${Global.baseUrl}prospecto/manual',
+  );
+
+  final token = GetStorage().read('token');
+
+  final response = await http.post(
+    uri,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    },
+    body: jsonEncode(datos),
+  );
+
+  if (response.statusCode == 401) {
+    controller.logOut();
+    throw Exception('Sesión expirada');
+  }
+
+  final data = _decodeMap(response);
+
+  if (response.statusCode != 201) {
+    throw Exception(
+      data['error'] ?? 'No fue posible registrar el prospecto',
+    );
+  }
+
+  return data;
 }
 
 Future<Map<String, dynamic>> consultarClienteExternoApi({
@@ -204,4 +314,51 @@ Future<Map<String, dynamic>> convertirProspectoApi({
   }
 
   throw Exception(data['error'] ?? 'No fue posible iniciar el proceso');
+}
+
+
+Future<List<Map<String, dynamic>>>
+obtenerHistorialProspectoApi({
+  required int idProspecto,
+}) async {
+  final uri = Uri.parse(
+    '${Global.baseUrl}prospecto/$idProspecto/historial',
+  );
+
+  final token = GetStorage().read('token');
+
+  final response = await http.get(
+    uri,
+    headers: {
+      'Authorization': 'Bearer $token',
+    },
+  );
+
+  if (response.statusCode == 401) {
+    controller.logOut();
+    throw Exception('Sesión expirada');
+  }
+
+  final data = _decodeMap(response);
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      data['error'] ??
+          'No fue posible cargar el historial',
+    );
+  }
+
+  final eventos = data['eventos'];
+
+  if (eventos is! List) {
+    throw Exception(
+      'El historial recibido no es válido',
+    );
+  }
+
+  return eventos
+      .map(
+        (e) => Map<String, dynamic>.from(e as Map),
+  )
+      .toList();
 }

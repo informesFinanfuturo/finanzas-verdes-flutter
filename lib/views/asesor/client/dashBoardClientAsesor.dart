@@ -20,6 +20,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:finanzas_verdes/views/asesor/client/ambiental/visitaAmbientalAsesor.dart';
+import 'package:finanzas_verdes/views/asesor/client/fve/listadoProcesosFve.dart';
 
 class Dashboardclientasesor extends StatefulWidget {
   const Dashboardclientasesor({super.key});
@@ -36,12 +38,15 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
 
   int selectedClientPage = 0;
   bool _headerExpanded = false;
+  int _ambientalRevision = 0;
 
   final List<String> clientSections = [
     'Resumen',
     'Facturas',
     'Activos',
     'Diagnósticos',
+    'Evaluación ambiental',
+    'Finanzas verdes',
     'Plan trabajo',
     'Visitas',
   ];
@@ -101,9 +106,57 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
     });
   }
 
-  void _changeClientPage(int index) {
+
+  Future<void> _changeClientPage(int index) async {
+    if (index == selectedClientPage) {
+      return;
+    }
+
+    bool reiniciarAmbiental = false;
+
+    if (
+    selectedClientPage == 4 &&
+        controller.hasUnsavedChanges.value
+    ) {
+      final salir = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cambios sin guardar'),
+          content: const Text(
+            'Hay respuestas ambientales sin guardar. '
+                '¿Quieres descartarlas y cambiar de pestaña?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, true),
+              child: const Text('Descartar'),
+            ),
+          ],
+        ),
+      );
+
+      if (salir != true || !mounted) {
+        return;
+      }
+
+      controller.hasUnsavedChanges.value = false;
+      reiniciarAmbiental = true;
+    }
+
+    if (!mounted) return;
+
     setState(() {
       selectedClientPage = index;
+
+      if (reiniciarAmbiental) {
+        _ambientalRevision++;
+      }
     });
 
     clientController.setSelectedClientSection(index);
@@ -134,6 +187,8 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
 
         return Obx(() {
           final _ = controller.isDark;
+
+          final cambiosPendientes = controller.hasUnsavedChanges.value;
 
           final List<Widget> kpiCards = [
             KpiCard(
@@ -213,6 +268,9 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
               Expanded(
                 child: PageView(
                   controller: pageController,
+                  physics: cambiosPendientes
+                      ? const NeverScrollableScrollPhysics()
+                      : null,
                   onPageChanged: (index) {
                     setState(() {
                       selectedClientPage = index;
@@ -263,26 +321,63 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                         controller.setPage(AsesorRoutes.editActivo);
                       },
                     ),
+
+
+                    // PÁGINA 3: DIAGNÓSTICOS
                     Viewdiagnosticosasesor(
-                      diagnosticos: List<Map<String, dynamic>>.from(
+                      diagnosticos:
+                      List<Map<String, dynamic>>.from(
                         clientController.Client["diagnosticos"] ?? [],
                       ),
 
                       onCreateDiagnostic: () async {
-                        final preview = await getClientFullImagesApi(
-                          idUsuario:
-                              clientController.Client["user"]["id_usuario"],
+                        final preview =
+                        await getClientFullImagesApi(
+                          idUsuario: clientController
+                              .Client["user"]["id_usuario"],
                         );
 
                         clientController.setPreview(preview);
 
-                        controller.setPage(AsesorRoutes.newDiagnostico);
+                        controller.setPage(
+                          AsesorRoutes.newDiagnostico,
+                        );
                       },
 
                       onOpenDiagnostic: (diagnostico) async {
-                        clientController.setDiagnostico(diagnostico);
+                        clientController.setDiagnostico(
+                          diagnostico,
+                        );
 
-                        controller.setPage(AsesorRoutes.viewDiagnostico);
+                        controller.setPage(
+                          AsesorRoutes.viewDiagnostico,
+                        );
+                      },
+                    ),
+
+                    // PÁGINA 4: EVALUACIÓN AMBIENTAL
+                    VisitaAmbientalAsesor(
+                      key: ValueKey(
+                        'ambiental_'
+                            '${clientController.Client["mipyme"]?["id_mipyme"]}_'
+                            '$_ambientalRevision',
+                      ),
+                    ),
+
+                    // PÁGINA 5: FINANZAS VERDES
+                    ListadoProcesosFve(
+                      key: ValueKey(
+                        'fve_'
+                            '${clientController.Client["mipyme"]?["id_mipyme"]}',
+                      ),
+
+                      idMipyme: int.tryParse(
+                        '${clientController.Client["mipyme"]?["id_mipyme"] ?? ""}',
+                      ) ??
+                          0,
+
+                      irADiagnosticos: () {
+                        _changeClientPage(3);
                       },
                     ),
                     Viewplanestrabajosasesor(

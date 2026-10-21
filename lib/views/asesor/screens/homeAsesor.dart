@@ -9,6 +9,7 @@ import 'package:finanzas_verdes/views/asesor/asesor/clienteExternoLookupAsesor.d
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:finanzas_verdes/views/asesor/asesor/prospectosGestionAsesor.dart';
 
 class Homeasesor extends StatefulWidget {
   const Homeasesor({super.key});
@@ -66,7 +67,7 @@ class _HomeasesorState extends State<Homeasesor> {
           horizontalPadding,
           20,
           horizontalPadding,
-          32,
+          0,
         ),
         child: Center(
           child: ConstrainedBox(
@@ -91,9 +92,13 @@ class _HomeasesorState extends State<Homeasesor> {
 
                 const SizedBox(height: 26),
 
+
                 Container(
                   key: _clientesSectionKey,
                   child: _buildClientsSection(),
+                ),
+                SizedBox(
+                  height: isDesktop ? 32 : 116,
                 ),
               ],
             ),
@@ -586,12 +591,16 @@ class _HomeasesorState extends State<Homeasesor> {
 
         ),
 
-        const SizedBox(
-          height:
-          14,
-        ),
 
+        const SizedBox(height: 14),
+
+        // Consulta de clientes existentes en Finanzas Verdes.
         const ClienteExternoLookupAsesor(),
+
+        const SizedBox(height: 24),
+
+        // Registro y seguimiento de nuevos prospectos.
+        const ProspectosGestionAsesor(),
 
       ],
 

@@ -4,6 +4,7 @@ import 'package:finanzas_verdes/controllers/ClientController.dart';
 import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/models/api/clientApi.dart';
 import 'package:finanzas_verdes/models/api/diagnosticoApi.dart';
+import 'package:finanzas_verdes/models/api/fveApi.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -22,6 +23,7 @@ class Viewdiagnosticoasesor extends StatefulWidget {
 class _ViewdiagnosticoasesorState
     extends State<Viewdiagnosticoasesor> {
   bool loading = false;
+  bool _startingFve = false;
 
   final ClientController clientController =
   Get.find<ClientController>();
@@ -542,6 +544,8 @@ class _ViewdiagnosticoasesorState
                         children: [
                           _buildHero(diagnostico, isMobile),
                           const SizedBox(height: 18),
+                          _buildFveStart(diagnostico, isMobile),
+                          const SizedBox(height: 18),
                           _buildExecutiveSummary(diagnostico),
                           const SizedBox(height: 18),
                           _buildSimulator(diagnostico, isMobile),
@@ -653,6 +657,140 @@ class _ViewdiagnosticoasesorState
                 ],
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Muestra errores visibles incluso cuando un snackbar no llega a aparecer.
+  Future<void> _mensajeFve(String titulo, String detalle) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(titulo),
+        content: SelectableText(detalle),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _iniciarFve(int idDiagnostico) async {
+    if (_startingFve) return;
+    debugPrint('[FVE-00] Clic: diagnostico=$idDiagnostico');
+    setState(() => _startingFve = true);
+    try {
+      final data = await iniciarProcesoFveApi(idDiagnostico: idDiagnostico)
+          .timeout(const Duration(seconds: 25));
+      debugPrint('[FVE-00] API respondio: creado=${data['creado']}');
+
+      final proceso = data['proceso'];
+      if (proceso is! Map) {
+        throw FveApiException('La API no devolvio el objeto proceso.');
+      }
+
+      clientController.setProcesoFve(Map<String, dynamic>.from(proceso));
+      if (!mounted) return;
+
+      // La navegacion puede fallar por permisos, confirmacion o bloqueo interno.
+      // Antes se ignoraba el resultado y no aparecia ningun aviso.
+      final navego = await controller.setPage(AsesorRoutes.procesoFve);
+      if (!navego && mounted) {
+        await _mensajeFve(
+          'Proceso FVE guardado, pero no se pudo abrir',
+          'La API devolvio el proceso #${proceso['id_proceso']}, '
+          'pero la navegacion fue bloqueada. '
+          'Verifica que el usuario tenga el rol Asesor y que '
+          'GeneralContoller.dart incluya AsesorRoutes.procesoFve '
+          'en el mapa pages y en las rutas permitidas del asesor.',
+        );
+      }
+    } catch (e) {
+      debugPrint('[FVE-00] ERROR: $e');
+      if (mounted) {
+        await _mensajeFve('No fue posible iniciar / continuar FVE',
+            e.toString());
+      }
+    } finally {
+      if (mounted) setState(() => _startingFve = false);
+    }
+  }
+
+  Widget _buildFveStart(Map diagnostico, bool isMobile) {
+    final id = _toInt(diagnostico['id_diagnostico']);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Global.primary.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Global.primary.withOpacity(0.24)),
+      ),
+      child: Wrap(
+        spacing: 18,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.spaceBetween,
+        children: [
+          SizedBox(
+            width: isMobile ? 240 : 530,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Negociaci\u00f3n FVE',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Global.text,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Inicia o retoma el proceso FVE desde este diagn\u00f3stico. '
+                  'No se crea otra negociaci\u00f3n al pulsar dos veces.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11.5,
+                    color: Global.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: _startingFve
+                ? null
+                : () async {
+                    if (id == null) {
+                      await _mensajeFve(
+                        'Diagnostico sin identificador',
+                        'No se encontro id_diagnostico en los datos de la '
+                        'pantalla. No se envio ninguna solicitud al servidor. '
+                        'Revisa la carga del diagnostico antes de iniciar FVE.',
+                      );
+                      return;
+                    }
+                    await _iniciarFve(id);
+                  },
+            icon: _startingFve
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.arrow_forward_rounded),
+            label: Text(_startingFve
+                ? 'Iniciando...'
+                : 'Iniciar / continuar FVE'),
           ),
         ],
       ),

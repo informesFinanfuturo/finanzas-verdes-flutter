@@ -18,6 +18,7 @@ class ClientController extends GetxController{
   final infoCliente = {}.obs;
   final diagnosticos = [].obs;
   final diagnostico = {}.obs;
+  final procesoFve = {}.obs;
   final selectedClientSection = 0.obs;
 
 
@@ -87,6 +88,10 @@ class ClientController extends GetxController{
     diagnostico.value = item;
   }
 
+  void setProcesoFve(Map item) {
+    procesoFve.value = item;
+  }
+
   void setSelectedClientSection(int index) {
     selectedClientSection.value = index;
   }
@@ -103,4 +108,5 @@ class ClientController extends GetxController{
   List get PlanesTrabajo => planesTrabajo.value;
   List get Diagnosticos => diagnosticos.value;
   Map get Diagnostico => diagnostico.value;
+  Map get ProcesoFve => procesoFve.value;
 }
