@@ -391,7 +391,7 @@ class ClienteAgendaCard extends StatelessWidget {
       return "Sin fecha";
     }
 
-    final date = DateTime.tryParse(value);
+    final date = DateTime.tryParse(value)?.toLocal();
 
     if (date == null) {
       return "Fecha inválida";

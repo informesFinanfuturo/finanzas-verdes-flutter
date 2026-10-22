@@ -15,7 +15,9 @@ Future<bool?> mostrarModalEditarCalendario(
     text: cliente["descripcion"] ?? "",
   );
 
-  final fechaOriginal = DateTime.parse(cliente["fecha_hora"]);
+  final fechaOriginal = DateTime.parse(
+    cliente["fecha_hora"].toString(),
+  ).toLocal();
 
   DateTime fechaSeleccionada = fechaOriginal;
 
@@ -24,7 +26,7 @@ Future<bool?> mostrarModalEditarCalendario(
     minute: fechaOriginal.minute,
   );
 
-  await showDialog(
+  return await showDialog<bool>(
     context: context,
     builder: (context) {
       return StatefulBuilder(
@@ -148,12 +150,95 @@ Future<bool?> mostrarModalEditarCalendario(
               ),
             ),
 
+
             actions: [
+              TextButton.icon(
+                icon: const Icon(Icons.event_busy_outlined),
+                label: const Text("Cancelar visita"),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.red,
+                ),
+                onPressed: () async {
+                  final idCalendario = int.tryParse(
+                    '${cliente["id_calendario"]}',
+                  );
+
+                  if (idCalendario == null) {
+                    Get.snackbar(
+                      "Error",
+                      "No se encontró el identificador de la visita.",
+                    );
+                    return;
+                  }
+
+                  final confirmar = await showDialog<bool>(
+                    context: context,
+                    builder: (confirmContext) => AlertDialog(
+                      title: const Text("Cancelar visita"),
+                      content: const Text(
+                        "¿Estás seguro de cancelar esta visita? "
+                            "La cita dejará de aparecer como activa "
+                            "en el calendario.",
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.pop(confirmContext, false),
+                          child: const Text("Volver"),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          onPressed: () =>
+                              Navigator.pop(confirmContext, true),
+                          child: const Text("Sí, cancelar visita"),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirmar != true || !context.mounted) {
+                    return;
+                  }
+
+                  try {
+                    await eliminarCalendarioApi(idCalendario);
+
+                    if (!context.mounted) return;
+
+                    // La cancelación fue aceptada.
+                    Navigator.pop(context, true);
+
+                    Get.snackbar(
+                      "Visita cancelada",
+                      "La cita fue cancelada correctamente.",
+                    );
+
+                    // Refrescar agenda y calendario.
+                    await controller.loadRange(
+                      controller.firstDate.value,
+                      controller.endDate.value,
+                    );
+
+                    await getClientsAgendaApi();
+                  } catch (e) {
+                    Get.snackbar(
+                      "Error al cancelar",
+                      e.toString().replaceFirst(
+                        "Exception: ",
+                        "",
+                      ),
+                    );
+                  }
+                },
+              ),
+
               TextButton(
                 onPressed: () {
                   Navigator.pop(context, false);
                 },
-                child: const Text("Cancelar"),
+                child: const Text("Cerrar"),
               ),
               ElevatedButton.icon(
                 icon: const Icon(Icons.save),
@@ -191,10 +276,6 @@ Future<bool?> mostrarModalEditarCalendario(
                       fechaHora: fechaHora,
                       descripcion: descripcionController.text,
                       direccion: cliente["direccion"] ?? "",
-                      usuarios: [
-                        cliente["id_usuario"],
-                        controller.User["id_usuario"],
-                      ],
                     );
 
                     controller.loadRange(

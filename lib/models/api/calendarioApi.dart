@@ -106,7 +106,7 @@ Future<void> eliminarCalendarioApi(int id) async {
     }
     if (response.statusCode == 401) {
       controller.logOut();
-      return;
+      throw Exception('Sesión expirada');
     }
 
     final data = jsonDecode(response.body);
@@ -118,13 +118,13 @@ Future<void> eliminarCalendarioApi(int id) async {
   }
 }
 
+
 Future<void> editarCalendarioApi({
   required int id,
   required String titulo,
   required DateTime fechaHora,
   String? direccion,
   String? descripcion,
-  required List<int> usuarios,
 }) async {
   final uri = Uri.parse('${Global.baseUrl}calendario/$id');
 
@@ -142,7 +142,6 @@ Future<void> editarCalendarioApi({
         "fecha_hora": fechaHora.toUtc().toIso8601String(),
         "direccion": direccion,
         "descripcion": descripcion,
-        "usuarios": usuarios,
       }),
     );
 

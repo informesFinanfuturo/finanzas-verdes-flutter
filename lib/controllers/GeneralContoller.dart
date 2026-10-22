@@ -596,7 +596,9 @@ class Generalcontoller extends GetxController {
     );
 
     final appointments = agenda.map<Appointment>((item) {
-      final fecha = DateTime.parse(item["fecha_hora"]);
+      final fecha = DateTime.parse(
+        item["fecha_hora"].toString(),
+      ).toLocal();
 
       /*
      * Título o tipo principal del evento.
