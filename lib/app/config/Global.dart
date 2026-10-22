@@ -15,7 +15,22 @@ class Global {
   static Color get container => controller.isDark.value ? primary.withOpacity(0.1) : Colors.white.withOpacity(0.8);
 
   // API
-  static String baseUrl = "http://20.169.169.108:4000/api/";
+
+  static String get baseUrl {
+    const url = String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: '',
+    );
+
+    if (url.isEmpty) {
+      throw StateError(
+        'La dirección de la API no está configurada.',
+      );
+    }
+
+    return url.endsWith('/') ? url : '$url/';
+  }
+
   //static String baseUrl = "http://localhost:3000/api/";
 
   static List<Map<String, dynamic>> itemConfig = [

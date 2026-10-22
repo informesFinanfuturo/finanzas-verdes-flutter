@@ -4,15 +4,17 @@ import 'package:intl/intl.dart';
 class Utils {
 
 
-  static String buildUrl(Map<String, dynamic> archivo) {
-    String path = archivo["ubicacion"] ?? '';
 
-    // asegurar que empieza con /api/
-    if (!path.startsWith('/api/')) {
+  static String buildUrl(Map<String, dynamic> archivo) {
+    String path = (archivo["ubicacion"] ?? '').toString();
+
+    if (!path.startsWith('/')) {
       path = '/$path';
     }
 
-    return "http://20.169.169.108:4000$path";
+    final servidor = Uri.parse(Global.baseUrl).origin;
+
+    return '$servidor$path';
   }
 
   static String formatFechaBonita(String fecha) {
