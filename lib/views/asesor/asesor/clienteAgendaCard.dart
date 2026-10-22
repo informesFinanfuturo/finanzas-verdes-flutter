@@ -190,7 +190,7 @@ class ClienteAgendaCard extends StatelessWidget {
                 child: SizedBox(
                   height: 40,
                   child: FilledButton.icon(
-                    onPressed: () async {
+                    onPressed: isProspect ? null : () async {
 
                       final tipoEntidad =
                           cliente[
@@ -254,66 +254,33 @@ class ClienteAgendaCard extends StatelessWidget {
 
                         );
 
-
                         return;
-
                       }
 
-
-                      /*
-   * ==================================
-   * CLIENTE FV TRADICIONAL
-   * ==================================
-   */
-                      if (
-                      cliente[
-                      "estado"] ==
-                          "activo"
-                      ) {
-
+                      if (cliente["estado"] == "activo") {
                         clientController.setClient(
-
                           await getClientDetailApi(
-
-                            idUsuario:
-                            cliente[
-                            "id_usuario"],
-
+                            idUsuario: cliente["id_usuario"],
                           ),
-
                         );
-
 
                         controller.setPage(
-                          AsesorRoutes
-                              .dashBoardClient,
+                          AsesorRoutes.dashBoardClient,
                         );
-
-                      } else if (
-                      cliente[
-                      "estado"] ==
-                          "nuevo"
-                      ) {
-
+                      } else if (cliente["estado"] == "nuevo") {
                         await mostrarModalDecisionCliente(
-
                           context,
-
                           cliente,
-
                           clientController,
-
                         );
-
                       }
-
                     },
                     icon: const Icon(
                       Icons.play_arrow_rounded,
                       size: 17,
                     ),
-                    label: const Text(
-                      "Iniciar",
+                    label: Text(
+                      isProspect ? 'Pendiente' : 'Iniciar',
                       maxLines: 1,
                     ),
                     style: FilledButton.styleFrom(

@@ -362,3 +362,48 @@ obtenerHistorialProspectoApi({
   )
       .toList();
 }
+
+
+Future<Map<String, dynamic>> agendarProspectoManualApi({
+  required int idProspecto,
+  required String titulo,
+  required DateTime fechaHora,
+  String? direccion,
+  String? descripcion,
+}) async {
+  final uri = Uri.parse(
+    '${Global.baseUrl}prospecto/$idProspecto/agendar',
+  );
+
+  final token = GetStorage().read('token');
+
+  final response = await http.post(
+    uri,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    },
+    body: jsonEncode({
+      'titulo': titulo.trim(),
+      'fecha_hora': fechaHora.toUtc().toIso8601String(),
+      'direccion': direccion?.trim(),
+      'descripcion': descripcion?.trim(),
+    }),
+  );
+
+  if (response.statusCode == 401) {
+    controller.logOut();
+    throw Exception('Sesión expirada');
+  }
+
+  final data = _decodeMap(response);
+
+  if (response.statusCode != 201) {
+    throw Exception(
+      data['error'] ??
+          'No fue posible agendar el prospecto',
+    );
+  }
+
+  return data;
+}

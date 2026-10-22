@@ -2,6 +2,8 @@
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/models/api/prospectoApi.dart';
 import 'package:flutter/material.dart';
+import 'package:finanzas_verdes/main.dart';
+import 'package:finanzas_verdes/models/api/calendarioApi.dart';
 
 class ProspectosGestionAsesor extends StatefulWidget {
   const ProspectosGestionAsesor({super.key});
@@ -442,10 +444,25 @@ class _ProspectosGestionAsesorState
                           descripcion +=
                           '\nMotivo: $motivo';
                         }
+
+                      } else if (tipo == 'agendamiento') {
+                        titulo = 'Visita agendada';
+
+                        descripcion =
+                        '${detalle['titulo'] ?? 'Visita'}\n'
+                            'Fecha programada: '
+                            '${detalle['fecha_hora'] ?? 'No disponible'}';
+
+                      } else if (tipo == 'cancelacion_visita') {
+                        titulo = 'Visita cancelada';
+
+                        descripcion =
+                        'La visita fue cancelada y el prospecto '
+                            'regresó al estado En gestión.';
+
                       } else {
                         titulo = tipo;
-                        descripcion =
-                        'Evento registrado en el proceso.';
+                        descripcion = 'Evento registrado en el proceso.';
                       }
 
                       final fecha = DateTime.tryParse(
@@ -492,6 +509,223 @@ class _ProspectosGestionAsesorState
         );
       },
     );
+  }
+
+
+  Future<void> _agendarVisita(
+      Map<String, dynamic> prospecto,
+      ) async {
+    if (_procesando) return;
+
+    final id = int.tryParse(
+      '${prospecto['id_prospecto']}',
+    );
+
+    if (id == null) return;
+
+    final tituloController = TextEditingController(
+      text: 'Visita inicial - ${prospecto['nombres'] ?? 'Prospecto'}',
+    );
+
+    final descripcionController = TextEditingController();
+
+    final direccionController = TextEditingController(
+      text: '${prospecto['direccion_negocio'] ?? ''}',
+    );
+
+    DateTime fecha = DateTime.now().add(
+      const Duration(days: 1),
+    );
+
+    TimeOfDay hora = const TimeOfDay(
+      hour: 9,
+      minute: 0,
+    );
+
+    bool guardando = false;
+
+    final creado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, actualizar) {
+            return AlertDialog(
+              title: const Text('Agendar visita'),
+              scrollable: true,
+              content: SizedBox(
+                width: 450,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Prospecto: ${prospecto['nombres'] ?? ''} '
+                          '${prospecto['apellidos'] ?? ''}',
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: tituloController,
+                      maxLength: 150,
+                      decoration: const InputDecoration(
+                        labelText: 'Título de la visita *',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: direccionController,
+                      maxLength: 250,
+                      decoration: const InputDecoration(
+                        labelText: 'Dirección',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descripcionController,
+                      maxLines: 3,
+                      maxLength: 2000,
+                      decoration: const InputDecoration(
+                        labelText: 'Observaciones',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: guardando
+                              ? null
+                              : () async {
+                            final elegida = await showDatePicker(
+                              context: dialogContext,
+                              initialDate: fecha,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime(2100),
+                            );
+
+                            if (elegida != null) {
+                              actualizar(() => fecha = elegida);
+                            }
+                          },
+                          icon: const Icon(Icons.calendar_today),
+                          label: Text(
+                            '${fecha.day}/${fecha.month}/${fecha.year}',
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: guardando
+                              ? null
+                              : () async {
+                            final elegida = await showTimePicker(
+                              context: dialogContext,
+                              initialTime: hora,
+                            );
+
+                            if (elegida != null) {
+                              actualizar(() => hora = elegida);
+                            }
+                          },
+                          icon: const Icon(Icons.access_time),
+                          label: Text(hora.format(dialogContext)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: guardando
+                      ? null
+                      : () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: guardando
+                      ? null
+                      : () async {
+                    final titulo = tituloController.text.trim();
+
+                    final fechaHora = DateTime(
+                      fecha.year,
+                      fecha.month,
+                      fecha.day,
+                      hora.hour,
+                      hora.minute,
+                    );
+
+                    if (titulo.isEmpty) {
+                      _avisar('Debes ingresar un título.');
+                      return;
+                    }
+
+                    if (!fechaHora.isAfter(DateTime.now())) {
+                      _avisar('Selecciona una fecha y hora futura.');
+                      return;
+                    }
+
+                    actualizar(() => guardando = true);
+
+                    try {
+                      await agendarProspectoManualApi(
+                        idProspecto: id,
+                        titulo: titulo,
+                        fechaHora: fechaHora,
+                        direccion: direccionController.text,
+                        descripcion: descripcionController.text,
+                      );
+
+                      if (dialogContext.mounted) {
+                        Navigator.pop(dialogContext, true);
+                      }
+                    } catch (e) {
+                      if (dialogContext.mounted) {
+                        _avisar(_mensaje(e));
+                        actualizar(() => guardando = false);
+                      }
+                    }
+                  },
+                  child: Text(
+                    guardando ? 'Agendando...' : 'Confirmar visita',
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    tituloController.dispose();
+    descripcionController.dispose();
+    direccionController.dispose();
+
+    if (!mounted || creado != true) return;
+
+    _avisar('Visita agendada correctamente.');
+
+    await _cargar();
+
+    if (!mounted) return;
+
+    try {
+      await controller.loadRange(
+        controller.firstDate.value,
+        controller.endDate.value,
+      );
+
+      await getClientsAgendaApi();
+    } catch (e) {
+      if (mounted) {
+        _avisar(
+          'La visita fue guardada, pero no se pudo '
+              'actualizar la agenda: ${_mensaje(e)}',
+        );
+      }
+    }
   }
 
 
@@ -595,6 +829,18 @@ class _ProspectosGestionAsesorState
                     ),
                     label: const Text('Iniciar gestión'),
                   ),
+
+                OutlinedButton.icon(
+                  onPressed: _procesando
+                      ? null
+                      : () => _agendarVisita(p),
+                  icon: const Icon(
+                    Icons.event_available_outlined,
+                    size: 18,
+                  ),
+                  label: const Text('Agendar visita'),
+                ),
+
                 OutlinedButton.icon(
                   onPressed: _procesando
                       ? null
