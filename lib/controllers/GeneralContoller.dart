@@ -529,11 +529,25 @@ class Generalcontoller extends GetxController {
       return;
     }
 
-    resetNavigation();
+    // La ruta inicial debe quedar lista antes de crear el dashboard.
+    final initialPage = <String, String>{
+      "administrador": Adminroutes.home,
+      "asesor": AsesorRoutes.home,
+      "cliente": ClienteRoutes.home,
+      "proveedor": ProveedorRoutes.home,
+      "super administrador": Adminroutes.home,
+    }[role];
+    timer?.cancel();
+    resetNavigation(initialPage: initialPage);
     Get.offAllNamed(destination);
   }
 
   void logOut() {
+    // En debug permite saber que llamada solicito cerrar la sesion.
+    assert(() {
+      debugPrintStack(label: '[AUTH] Origen del cierre de sesion');
+      return true;
+    }());
     resetNavigation();
     setUser({});
     final box = GetStorage();

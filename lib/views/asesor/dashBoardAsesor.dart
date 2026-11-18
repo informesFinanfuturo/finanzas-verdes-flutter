@@ -26,13 +26,6 @@ class Dashboardasesor extends StatefulWidget {
 class _DashboardasesorState
     extends State<Dashboardasesor> {
   @override
-  void initState() {
-    super.initState();
-
-    controller.resetNavigation(initialPage: AsesorRoutes.home);
-  }
-
-  @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final bool isDesktop = width >= 800;
@@ -66,12 +59,20 @@ class _DashboardasesorState
                   width: double.infinity,
                   height: double.infinity,
                   color: Global.bg,
-                  child: FadeInDown(
-                    key: ValueKey(controller.Page),
-                    duration: Duration(milliseconds: 250),
-                    from: 20,
-                    child: controller.Pages[controller.Page],
-                  ),
+                  child: controller.Pages[controller.Page] is Widget
+                      ? FadeInDown(
+                          key: ValueKey(controller.Page),
+                          duration: const Duration(milliseconds: 250),
+                          from: 20,
+                          child: controller.Pages[controller.Page] as Widget,
+                        )
+                      : Center(
+                          child: controller.User.isEmpty
+                              ? const CircularProgressIndicator()
+                              : const Text(
+                                  'No fue posible restaurar la pagina autorizada.',
+                                ),
+                        ),
                 ),
               ),
             ],
