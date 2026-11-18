@@ -5,6 +5,9 @@ import 'package:finanzas_verdes/controllers/RolController.dart';
 import 'package:finanzas_verdes/controllers/UserController.dart';
 import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/models/api/activoApi.dart';
+import 'package:finanzas_verdes/models/api/fveInventarioApi.dart';
+import 'package:finanzas_verdes/views/asesor/client/activo/fichaTecnicaVerdeActivo.dart';
+import 'package:finanzas_verdes/views/asesor/client/activo/perfilUsoActivo.dart';
 import 'package:finanzas_verdes/models/api/clientApi.dart';
 import 'package:finanzas_verdes/models/api/rolApi.dart';
 import 'package:finanzas_verdes/models/api/userApi.dart';
@@ -34,6 +37,14 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
   final modeloCtrl = TextEditingController();
 
   bool loading = false;
+  Map<String, dynamic>? _datosTecnicosFve;
+  Map<String, dynamic>? _perfilUso;
+
+  @override
+  void initState() {
+    super.initState();
+    nombreCtrl.addListener(() { if (mounted) setState(() {}); });
+  }
 
   @override
   void dispose() {
@@ -107,6 +118,7 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
 
                               onChanged: (value) {
                                 setState(() {
+                                  _perfilUso = null;
                                   tipoSeleccionado = value!;
                                 });
                               },
@@ -122,12 +134,25 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
                         ),
                         const SizedBox(height: 12),
 
+                        PerfilUsoActivo(
+                          tipo: tipoSeleccionado,
+                          horarioEmpresa: Get.find<ClientController>().Client['mipyme']?['horario_operacion'],
+                          onChanged: (v) => _perfilUso = v,
+                        ),
+                        const SizedBox(height: 12),
                         _input(marcaCtrl, "Marca", Icons.branding_watermark),
                         const SizedBox(height: 12),
 
                         _input(modeloCtrl, "Modelo", Icons.precision_manufacturing),
                         const SizedBox(height: 12),
 
+                        FichaTecnicaVerdeActivo(
+                          idActivo: null,
+                          tipo: tipoSeleccionado,
+                          nombre: nombreCtrl.text,
+                          onChanged: (datos) { _datosTecnicosFve = datos; },
+                        ),
+                        const SizedBox(height: 12),
                         _inputArea(descripcionCtrl, "Ejemplo: frecuencia de uso, reparaciones, daños, modificaciones, ubicación, antigüedad, etc.", Icons.description, "Observaciones del activo", required: false),
                         const SizedBox(height: 24),
                       ],
@@ -168,6 +193,10 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_perfilUso == null) {
+      Get.snackbar('Uso del activo', 'Indica qué sucede con este equipo fuera del horario laboral.');
+      return;
+    }
 
     setState(() => loading = true);
 
@@ -179,10 +208,22 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
         tipo: tipoSeleccionado!,
         descripcion: descripcionCtrl.text.isEmpty ? null : descripcionCtrl.text,
         idMipyme: clientController.Client["mipyme"]["id_mipyme"], // ✅ clave
-        createdBy: controller.User["id_usuario"],
         marca: marcaCtrl.text,
-        modelo: modeloCtrl.text.isEmpty ? null : modeloCtrl.text
+        modelo: modeloCtrl.text.isEmpty ? null : modeloCtrl.text,
+        perfilUso: _perfilUso,
       );
+
+      if (_datosTecnicosFve != null && activo["id_activo"] != null) {
+        try {
+          await guardarInventarioFveApi(
+            idActivo: (activo["id_activo"] as num).toInt(),
+            datosTecnicos: _datosTecnicosFve!,
+          );
+        } catch (e) {
+          Get.snackbar("Información técnica",
+            "Activo creado. Sus datos técnicos opcionales no pudieron guardarse: $e");
+        }
+      }
 
       // ✅ refrescar cliente (para traer activos nuevos)
       clientController.setClient(

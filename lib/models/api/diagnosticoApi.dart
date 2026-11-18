@@ -282,85 +282,105 @@ getAlternativasActivoDiagnosticoApi({
   required int idDiagnostico,
   required int idActivo,
 }) async {
-
   final uri = Uri.parse(
-    '${Global.baseUrl}'
-        'diagnostico/'
-        '$idDiagnostico/'
-        'activo/'
-        '$idActivo/'
-        'alternativas',
+    '${Global.baseUrl}diagnostico/$idDiagnostico/activo/$idActivo/alternativas',
   );
-
-  final token =
-  GetStorage().read("token");
-
+  final token = GetStorage().read('token');
   try {
-
-    final response =
-    await http.get(
+    final response = await http.get(
       uri,
       headers: {
-        'Content-Type':
-        'application/json',
-
-        'Authorization':
-        'Bearer $token',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
       },
-    );
+    ).timeout(const Duration(seconds: 25));
 
-    Map<String, dynamic> data = {};
-
-    if (response.body.isNotEmpty) {
-      final decoded =
-      jsonDecode(response.body);
-
-      if (decoded
-      is Map<String, dynamic>) {
-        data = decoded;
+    // No ejecutar jsonDecode si el servidor devolvio HTML (404 de Express,
+    // un proxy, una pagina de login o un servidor equivocado).
+    Map<String, dynamic>? data;
+    final tipo = response.headers['content-type']?.toLowerCase() ?? '';
+    if (tipo.contains('application/json') && response.body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map) {
+          data = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {
+        throw Exception('La API devolvio JSON invalido (HTTP ${response.statusCode}).');
       }
-    }
-
-    if (response.statusCode == 200) {
-      return data;
     }
 
     if (response.statusCode == 401) {
       controller.logOut();
-
-      throw Exception(
-        'La sesión ha expirado',
-      );
+      throw Exception('La sesion ha expirado. Inicia sesion nuevamente.');
     }
 
-    if (response.statusCode == 400) {
-      throw Exception(
-        data["error"] ??
-            'Los datos enviados no son válidos',
-      );
+    if (response.statusCode == 200) {
+      if (data == null) {
+        throw Exception('La API devolvio una respuesta inesperada en vez de los productos del catalogo.');
+      }
+      if (data['activo'] is! Map || data['alternativas'] is! List) {
+        throw Exception('La API no devolvio el formato de alternativas esperado.');
+      }
+      return data;
     }
 
-    if (response.statusCode == 404) {
-      throw Exception(
-        data["error"] ??
-            'No se encontraron alternativas',
-      );
+    // Referencia historica no vinculada. Permitir al asesor resolverla
+    // antes de elegir un producto; no tratarla como un error generico.
+    if (response.statusCode == 409 &&
+        data?['codigo'] == 'ACTIVO_SIN_VINCULO') {
+      return data!;
     }
 
-    throw Exception(
-      data["error"] ??
-          'Error inesperado '
-              '(${response.statusCode})',
-    );
-
+    if (data != null && data['error'] != null) {
+      throw Exception(data['error'].toString());
+    }
+    if (response.statusCode == 404 && !tipo.contains('application/json')) {
+      throw Exception(
+        'La API no reconoce la ruta de alternativas (404). Comprueba que el backend local fue reiniciado y que Flutter utiliza su direccion.',
+      );
+    }
+    throw Exception('No fue posible consultar alternativas (HTTP ${response.statusCode}).');
   } catch (error) {
-
-    print(
-      'ERROR OBTENER ALTERNATIVAS '
-          'DEL ACTIVO: $error',
-    );
-
+    debugPrint('ERROR OBTENER ALTERNATIVAS DEL ACTIVO: $error');
     rethrow;
   }
+}
 
+// Vinculacion EXPLICITA, con confirmacion del asesor. Nunca se asigna un
+// activo de otra empresa ni se crea un registro sin autorizacion.
+Future<Map<String, dynamic>> vincularActivoDiagnosticoApi({
+  required int idDiagnostico,
+  required int idActivoOriginal,
+  int? idActivoReal,
+  bool crearDesdeDiagnostico = false,
+}) async {
+  final token = GetStorage().read('token');
+  final uri = Uri.parse(
+    '${Global.baseUrl}diagnostico/$idDiagnostico/activo/$idActivoOriginal/vincular',
+  );
+  final response = await http.post(uri,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    },
+    body: jsonEncode({
+      if (idActivoReal != null) 'id_activo_real': idActivoReal,
+      if (crearDesdeDiagnostico) 'crear_desde_diagnostico': true,
+    }),
+  ).timeout(const Duration(seconds: 25));
+  Map<String,dynamic> data = {};
+  try {
+    final decoded=jsonDecode(response.body);
+    if(decoded is Map) data=Map<String,dynamic>.from(decoded);
+  } catch (_) {}
+  if(response.statusCode==401) {
+    controller.logOut();
+    throw Exception('La sesion ha expirado.');
+  }
+  if(response.statusCode!=200) {
+    throw Exception(data['error']?.toString() ??
+      'No se pudo vincular el activo (HTTP ${response.statusCode}).');
+  }
+  return data;
 }

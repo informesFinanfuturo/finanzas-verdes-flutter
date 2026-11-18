@@ -38,7 +38,9 @@ class AppPages {
     ),
     GetPage(
       name: Routes.dashboardSuperAdmin,
-      page: () => const Dashboardsuperadmin(),
+      // Conservamos la URL /superadmin para compatibilidad, pero ambos
+      // roles usan exactamente la misma interfaz administrativa.
+      page: () => const Dashboardadmin(),
     ),
     GetPage(
       name: Routes.changeRequiredPassword,

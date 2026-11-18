@@ -421,6 +421,11 @@ mostrarModalDecisionCliente(
   final nombreMipymeController =
   TextEditingController();
 
+  // PARCHE_AGENDA_CONVERSION_V1
+  final correoProspectoController = TextEditingController(
+    text: '${usuario['correo'] ?? ''}',
+  );
+
 
   final bool isProspect =
       usuario[
@@ -696,6 +701,18 @@ mostrarModalDecisionCliente(
                     ],
 
 
+                    if (isProspect && decision == "activo") ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: correoProspectoController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Correo del prospecto (obligatorio)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+
                     if (
                     decision ==
                         "pospuesto" ||
@@ -823,6 +840,13 @@ mostrarModalDecisionCliente(
                   }
 
 
+                  if (isProspect && decision == "activo" &&
+                      !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(
+                          correoProspectoController.text.trim())) {
+                    Get.snackbar('Campo requerido', 'Ingresa un correo valido para convertir el prospecto');
+                    return;
+                  }
+
                   Navigator.pop(
                     context,
                   );
@@ -912,6 +936,8 @@ mostrarModalDecisionCliente(
                           nombreMipymeController
                               .text
                               .trim(),
+
+                          correo: correoProspectoController.text.trim(),
 
                         );
 
@@ -1127,6 +1153,8 @@ mostrarModalDecisionCliente(
 
   nombreMipymeController
       .dispose();
+
+  correoProspectoController.dispose();
 
 }
 

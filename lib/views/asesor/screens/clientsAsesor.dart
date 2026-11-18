@@ -4,6 +4,7 @@ import 'package:finanzas_verdes/controllers/ClientController.dart';
 import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/models/api/clientApi.dart';
 import 'package:finanzas_verdes/views/asesor/client/viewDetailsInactiveClient.dart';
+import 'package:finanzas_verdes/views/asesor/asesor/prospectosGestionAsesor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -27,6 +28,8 @@ class _ClientsasesorState extends State<Clientsasesor> {
 
   String searchText = '';
   String selectedFilter = 'activos';
+  // PARCHE_CLIENTES_PROSPECTOS_V1
+  bool _mostrarProspectos = false;
 
   bool isFiltering = false;
   bool isSearchingExact = false;
@@ -60,6 +63,12 @@ class _ClientsasesorState extends State<Clientsasesor> {
           );
           break;
 
+        case 'nuevos':
+          await getClientsByEstadoApi(
+            clientController: clientController,
+            estado: 'nuevo',
+          );
+          break;
         case 'pospuestos':
           await getClientsByEstadoApi(
             clientController: clientController,
@@ -233,13 +242,43 @@ class _ClientsasesorState extends State<Clientsasesor> {
   }
 
   void _createClient() {
-    controller.setPage(
-      AsesorRoutes.newClientMipyme,
+    setState(() => _mostrarProspectos = true);
+  }
+
+  Widget _vistaProspectos() {
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextButton.icon(
+            onPressed: () {
+              setState(() => _mostrarProspectos = false);
+              _loadClients('activos');
+            },
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Volver a clientes'),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              child: ProspectosGestionAsesor(
+                onConvertido: () async {
+                  if (!mounted) return;
+                  setState(() => _mostrarProspectos = false);
+                  await _loadClients('activos');
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_mostrarProspectos) return _vistaProspectos();
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isDesktop =
@@ -373,7 +412,7 @@ class _ClientsasesorState extends State<Clientsasesor> {
               size: 19,
             ),
             label: Text(
-              'Nuevo cliente',
+              'Prospectos',
               style: GoogleFonts.poppins(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -395,7 +434,7 @@ class _ClientsasesorState extends State<Clientsasesor> {
         else
           IconButton.filled(
             onPressed: _createClient,
-            tooltip: 'Nuevo cliente',
+            tooltip: 'Prospectos',
             icon: const Icon(
               Icons.person_add_alt_1_rounded,
             ),
@@ -549,6 +588,14 @@ class _ClientsasesorState extends State<Clientsasesor> {
                 selected: selectedFilter == 'activos',
                 color: const Color(0xFF238A57),
                 onTap: () => _loadClients('activos'),
+              ),
+              const SizedBox(width: 8),
+              _ClientFilterChip(
+                label: 'Nuevos (alta directa)',
+                icon: Icons.person_outline_rounded,
+                selected: selectedFilter == 'nuevos',
+                color: const Color(0xFF607D8B),
+                onTap: () => _loadClients('nuevos'),
               ),
               const SizedBox(width: 8),
               _ClientFilterChip(

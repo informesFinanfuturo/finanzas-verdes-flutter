@@ -233,32 +233,55 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
             ),
           ];
 
+          final modoAmbientalMovil = !isDesktop && selectedClientPage == 4;
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!isDesktop) const Divider(height: 1),
-
-              // Título de la pantalla
-              _buildPageTitle(),
-
-              const SizedBox(height: 8),
-
-              // Escritorio siempre expandido.
-              if (isDesktop)
+              if (modoAmbientalMovil)
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: _buildExpandedClientHeader(
-                    isDesktop: true,
-                    kpiCards: kpiCards,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: SizedBox(
+                    height: 46,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Volver a clientes',
+                          onPressed: () => controller.backPage(),
+                          icon: const Icon(Icons.arrow_back),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${clientController.Client["mipyme"]?["nombre_mipyme"] ?? "Cliente"}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 )
-              else
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: _buildMobileClientHeader(kpiCards: kpiCards),
-                ),
-
-              const SizedBox(height: 8),
+              else ...[
+                _buildPageTitle(),
+                const SizedBox(height: 8),
+                if (isDesktop)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: _buildExpandedClientHeader(
+                      isDesktop: true,
+                      kpiCards: kpiCards,
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: _buildMobileClientHeader(kpiCards: kpiCards),
+                  ),
+                const SizedBox(height: 8),
+              ],
 
               // Navegación de las secciones del cliente
               _buildClientTabs(),
@@ -309,7 +332,9 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
                         clientController.Client["activos"] ?? [],
                       ),
                       onCreateAsset: () {
-                        controller.setPage(AsesorRoutes.newActivo);
+                        // Igual que Nueva factura: abrir directamente el editor.
+                        clientController.setActivo({});
+                        controller.setPage(AsesorRoutes.editActivo);
                       },
                       onOpenAsset: (activo) async {
                         final assetDetail = await getActivoApi(

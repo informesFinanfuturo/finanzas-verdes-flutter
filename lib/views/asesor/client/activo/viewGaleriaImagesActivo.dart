@@ -52,7 +52,7 @@ Future<bool> openGaleriaActivo(
                   final url = Utils.buildUrl(image);
 
                   return PhotoViewGalleryPageOptions(
-                    imageProvider: NetworkImage(url),
+                    imageProvider: NetworkImage(url, headers: Utils.imageHeaders),
                     minScale:
                     PhotoViewComputedScale.contained,
                     maxScale:
@@ -128,7 +128,7 @@ Future<bool> openGaleriaActivo(
                         final url =
                         Utils.buildUrl(image);
 
-                        await NetworkImage(url)
+                        await NetworkImage(url, headers: Utils.imageHeaders)
                             .evict();
 
                         localImages.removeAt(

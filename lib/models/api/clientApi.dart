@@ -54,13 +54,11 @@ Future<void> createClientApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR AL CREAR CLIENTE: $e");
     rethrow;
   }
 }
-
 
 Future<void> editClientApi({
   required int idUsuario,
@@ -89,7 +87,8 @@ Future<void> editClientApi({
         if (email != null) 'email': email,
         if (telefono != null) 'telefono': telefono,
         if (estado != null) 'estado': estado,
-        if (estado_observaciones != null) 'estado_observaciones': estado_observaciones,
+        if (estado_observaciones != null)
+          'estado_observaciones': estado_observaciones,
         'updated_by': updatedBy,
       }),
     );
@@ -112,25 +111,20 @@ Future<void> editClientApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print('ERROR AL EDITAR CLIENTE: $e');
     rethrow;
   }
 }
 
-Future<void> getClientApi({
-  required ClientController clientController
-}) async {
+Future<void> getClientApi({required ClientController clientController}) async {
   final uri = Uri.parse('${Global.baseUrl}client');
   final token = GetStorage().read("token");
 
   try {
     final response = await http.get(
       uri,
-      headers: {
-        "Authorization" : "Bearer $token"
-      }
+      headers: {"Authorization": "Bearer $token"},
     );
 
     if (response.statusCode == 200) {
@@ -149,7 +143,6 @@ Future<void> getClientApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR ESPECIAL AL OBTENER LOS CLIENTES: $e");
     rethrow;
@@ -158,7 +151,7 @@ Future<void> getClientApi({
 
 Future<void> getClientsByEstadoApi({
   required ClientController clientController,
-  required String estado
+  required String estado,
 }) async {
   final uri = Uri.parse('${Global.baseUrl}client/estado');
   final token = GetStorage().read("token");
@@ -166,10 +159,7 @@ Future<void> getClientsByEstadoApi({
   try {
     final response = await http.get(
       uri,
-      headers: {
-        "Authorization" : "Bearer $token",
-        "estado" : estado
-      }
+      headers: {"Authorization": "Bearer $token", "estado": estado},
     );
 
     if (response.statusCode == 200) {
@@ -188,7 +178,6 @@ Future<void> getClientsByEstadoApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR ESPECIAL AL OBTENER LOS CLIENTES: $e");
     rethrow;
@@ -227,7 +216,6 @@ Future<Map<String, dynamic>> getClientDetailApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR GET USER DETAIL: $e");
     rethrow;
@@ -248,9 +236,7 @@ Future<void> createMipymeApi({
   double? ingresos,
   double? egresos,
   String? codigoCiiu,
-
 }) async {
-
   final uri = Uri.parse('${Global.baseUrl}client/mipyme');
   final token = GetStorage().read("token");
 
@@ -262,7 +248,6 @@ Future<void> createMipymeApi({
         'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
-
         // OBLIGATORIOS
         'id_usuario': idUsuario,
         'created_by': createdBy,
@@ -273,7 +258,8 @@ Future<void> createMipymeApi({
         if (sectorEconomico != null) 'sector_economico': sectorEconomico,
         if (direccion != null) 'direccion': direccion,
         if (municipio != null) 'municipio': municipio,
-        if (descripcionEmpresa != null) 'descripcion_empresa': descripcionEmpresa,
+        if (descripcionEmpresa != null)
+          'descripcion_empresa': descripcionEmpresa,
         if (cantidadEmpleados != null) 'cantidad_empleados': cantidadEmpleados,
         if (ingresos != null) 'ingresos': ingresos,
         if (egresos != null) 'egresos': egresos,
@@ -297,13 +283,11 @@ Future<void> createMipymeApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR CREATE MIPYME: $e");
     rethrow;
   }
 }
-
 
 Future<Map<String, dynamic>> getClientFullImagesApi({
   required int idUsuario,
@@ -341,16 +325,15 @@ Future<Map<String, dynamic>> getClientFullImagesApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR GET USER DETAIL: $e");
     rethrow;
   }
 }
 
-Future<void> getClienteMipymeApi ({
+Future<void> getClienteMipymeApi({
   required int idUsuario,
-  required ClientController clientController
+  required ClientController clientController,
 }) async {
   final uri = Uri.parse('${Global.baseUrl}client/mipyme/$idUsuario');
   final token = GetStorage().read("token");
@@ -385,7 +368,6 @@ Future<void> getClienteMipymeApi ({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR GET USER DETAIL: $e");
     rethrow;
@@ -394,9 +376,8 @@ Future<void> getClienteMipymeApi ({
 
 Future<void> getActivosByUsuarioApi({
   required int idUsuario,
-  required ClientController clientController
+  required ClientController clientController,
 }) async {
-
   final uri = Uri.parse('${Global.baseUrl}client/activo/$idUsuario');
   final token = GetStorage().read("token");
 
@@ -427,7 +408,6 @@ Future<void> getActivosByUsuarioApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR GET ACTIVOS: $e");
     rethrow;
@@ -436,9 +416,8 @@ Future<void> getActivosByUsuarioApi({
 
 Future<void> getConsumosByUsuarioApi({
   required int idUsuario,
-  required ClientController clientController
+  required ClientController clientController,
 }) async {
-
   final uri = Uri.parse('${Global.baseUrl}client/consumo/$idUsuario');
   final token = GetStorage().read("token");
 
@@ -469,87 +448,56 @@ Future<void> getConsumosByUsuarioApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR GET CONSUMOS: $e");
     rethrow;
   }
 }
 
-Future<void> getDiagnosticosByUsuario({required ClientController clientController,}) async {
-  final uri =
-  Uri.parse(
-    '${Global.baseUrl}diagnostico',
-  );
+Future<void> getDiagnosticosByUsuario({
+  required ClientController clientController,
+}) async {
+  final uri = Uri.parse('${Global.baseUrl}diagnostico');
 
-  final token =
-  GetStorage().read(
-    "token",
-  );
+  final token = GetStorage().read("token");
 
   try {
-    final response =
-    await http.get(
+    final response = await http.get(
       uri,
       headers: {
-        'Content-Type':
-        'application/json',
+        'Content-Type': 'application/json',
 
-        'Authorization':
-        'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
     );
 
-    Map<String, dynamic> data =
-    {};
+    Map<String, dynamic> data = {};
 
     if (response.body.isNotEmpty) {
-      final decoded =
-      jsonDecode(
-        response.body,
-      );
+      final decoded = jsonDecode(response.body);
 
-      if (
-      decoded is Map
-      ) {
-        data =
-        Map<String, dynamic>.from(
-          decoded,
-        );
+      if (decoded is Map) {
+        data = Map<String, dynamic>.from(decoded);
       }
     }
 
     if (response.statusCode == 200) {
-      final diagnosticosRaw =
-      data["diagnosticos"];
+      final diagnosticosRaw = data["diagnosticos"];
 
-      final diagnosticos =
-      diagnosticosRaw is List
-          ? List<dynamic>.from(
-        diagnosticosRaw,
-      )
+      final diagnosticos = diagnosticosRaw is List
+          ? List<dynamic>.from(diagnosticosRaw)
           : <dynamic>[];
 
-      clientController.setDiagnosticos(
-        diagnosticos,
-      );
+      clientController.setDiagnosticos(diagnosticos);
 
-      final propuestaActual =
-      data["propuesta_actual"];
+      final propuestaActual = data["propuesta_actual"];
 
-      if (
-      propuestaActual is Map
-      ) {
+      if (propuestaActual is Map) {
         clientController.setDiagnostico(
-          Map<String, dynamic>.from(
-            propuestaActual,
-          ),
+          Map<String, dynamic>.from(propuestaActual),
         );
       } else {
-        clientController
-            .setDiagnostico(
-          {},
-        );
+        clientController.setDiagnostico({});
       }
 
       return;
@@ -558,52 +506,34 @@ Future<void> getDiagnosticosByUsuario({required ClientController clientControlle
     if (response.statusCode == 401) {
       controller.logOut();
 
-      throw Exception(
-        'Sesión expirada',
-      );
+      throw Exception('Sesión expirada');
     }
 
     if (response.statusCode == 403) {
-      throw Exception(
-        'No tienes permiso para consultar la propuesta',
-      );
+      throw Exception('No tienes permiso para consultar la propuesta');
     }
 
     if (response.statusCode == 404) {
-      clientController
-          .setDiagnosticos(
-        [],
-      );
+      clientController.setDiagnosticos([]);
 
-      clientController
-          .setDiagnostico(
-        {},
-      );
+      clientController.setDiagnostico({});
 
-      throw Exception(
-        data["error"] ??
-            'No se encontró una empresa asociada',
-      );
+      throw Exception(data["error"] ?? 'No se encontró una empresa asociada');
     }
 
     throw Exception(
-      data["error"] ??
-          'Error inesperado (${response.statusCode})',
+      data["error"] ?? 'Error inesperado (${response.statusCode})',
     );
-
   } catch (error) {
-    print(
-      'ERROR GET PROPUESTA CLIENTE: $error',
-    );
+    print('ERROR GET PROPUESTA CLIENTE: $error');
 
     rethrow;
   }
 }
 
-Future<void> getPlanesTrabajoByUsuario ({
-  required ClientController clientController
+Future<void> getPlanesTrabajoByUsuario({
+  required ClientController clientController,
 }) async {
-
   final uri = Uri.parse('${Global.baseUrl}plantrabajo');
   final token = GetStorage().read("token");
 
@@ -630,11 +560,12 @@ Future<void> getPlanesTrabajoByUsuario ({
 
     if (response.statusCode == 400 || response.statusCode == 404) {
       final data = jsonDecode(response.body);
-      throw Exception(data['error'] ?? 'Error al obtener los planes de trabajo');
+      throw Exception(
+        data['error'] ?? 'Error al obtener los planes de trabajo',
+      );
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR GET PLANES TRABAJO: $e");
     rethrow;
@@ -664,6 +595,8 @@ Future<void> createClientWithMipymeApi({
   String? tipo_persona,
   String? tipo_empresa,
   int? estrato,
+  String? tipoFactura, // FVE_FACTURA_COMERCIAL_20261114
+  Map<String, dynamic>? horarioOperacion,
 
   // ✅ EXTRA
   String? tipoRelacion,
@@ -671,8 +604,9 @@ Future<void> createClientWithMipymeApi({
   required int createdBy,
   required ClientController clientController,
 }) async {
-
-  final uri = Uri.parse('${Global.baseUrl}client/client-mipyme'); // ✅ ENDPOINT NUEVO
+  final uri = Uri.parse(
+    '${Global.baseUrl}client/client-mipyme',
+  ); // ✅ ENDPOINT NUEVO
   final token = GetStorage().read("token");
 
   try {
@@ -683,7 +617,6 @@ Future<void> createClientWithMipymeApi({
         'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
-
         // CLIENTE
         'documento': documento,
         'nombre_usuario': nombreUsuario,
@@ -704,9 +637,11 @@ Future<void> createClientWithMipymeApi({
         'codigo_ciiu': codigoCiiu,
         'departamento': departamento,
         'barrio': barrio,
-        'estrato' : estrato,
-        'tipo_persona' : tipo_persona,
-        'tipo_empresa' : tipo_empresa,
+        'estrato': estrato,
+        'tipo_factura': tipoFactura,
+        'horario_operacion': horarioOperacion,
+        'tipo_persona': tipo_persona,
+        'tipo_empresa': tipo_empresa,
 
         /// ✅ RELACIÓN
         'tipo_relacion': tipoRelacion ?? 'propietario',
@@ -717,13 +652,12 @@ Future<void> createClientWithMipymeApi({
 
     /// ✅ ÉXITO
     if (response.statusCode == 201) {
-
       Get.snackbar(
         "Éxito",
         data["message"] ?? "Cliente y mipyme creados",
         snackPosition: SnackPosition.BOTTOM,
         colorText: Colors.white,
-        backgroundColor: Colors.green
+        backgroundColor: Colors.green,
       );
 
       await getClientApi(clientController: clientController);
@@ -742,8 +676,9 @@ Future<void> createClientWithMipymeApi({
     }
 
     /// ✅ OTROS
-    throw Exception(data["error"] ?? 'Error inesperado (${response.statusCode})');
-
+    throw Exception(
+      data["error"] ?? 'Error inesperado (${response.statusCode})',
+    );
   } catch (e) {
     print("ERROR CREATE CLIENT + MIPYME: $e");
 
@@ -752,12 +687,13 @@ Future<void> createClientWithMipymeApi({
       e.toString(),
       snackPosition: SnackPosition.BOTTOM,
       colorText: Colors.white,
-      backgroundColor: Colors.red
+      backgroundColor: Colors.red,
     );
 
     rethrow;
   }
 }
+
 Future<void> updateMipymeApi({
   required int idMipyme,
   required int updatedBy,
@@ -779,10 +715,10 @@ Future<void> updateMipymeApi({
   String? tipo_persona,
   String? tipo_empresa,
   int? estrato,
+  String? tipoFactura, // FVE_FACTURA_COMERCIAL_20261114
+  Map<String, dynamic>? horarioOperacion,
   String? estado,
-
 }) async {
-
   final uri = Uri.parse('${Global.baseUrl}client/mipyme/$idMipyme');
   final token = GetStorage().read("token");
 
@@ -794,10 +730,11 @@ Future<void> updateMipymeApi({
         'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
-
         'nombre_mipyme': nombreMipyme,
         'nit': nit,
-        'sector_economico': sectorEconomico,
+        if (sectorEconomico != null)
+          'sector_economico':
+              sectorEconomico, // FVE_FIX_SECTOR_NULL_API_20261113
 
         'departamento': departamento,
         'municipio': municipio,
@@ -813,6 +750,9 @@ Future<void> updateMipymeApi({
         'tipo_empresa': tipo_empresa,
 
         'estrato': estrato,
+
+        'tipo_factura': tipoFactura,
+        'horario_operacion': horarioOperacion,
 
         'updated_by': updatedBy,
       }),
@@ -834,17 +774,13 @@ Future<void> updateMipymeApi({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR UPDATE MIPYME: $e");
     rethrow;
   }
 }
 
-Future<void> inactiveClientApi ({
-  required int idClient,
-}) async {
-
+Future<void> inactiveClientApi({required int idClient}) async {
   final uri = Uri.parse('${Global.baseUrl}client/$idClient');
   final token = GetStorage().read("token");
 
@@ -873,17 +809,13 @@ Future<void> inactiveClientApi ({
     }
 
     throw Exception('Error inesperado (${response.statusCode})');
-
   } catch (e) {
     print("ERROR INACTIVAR ACTIVO : $e");
     rethrow;
   }
 }
 
-Future<Map<String, dynamic>> searchClient({
-  required String query,
-}) async {
-
+Future<Map<String, dynamic>> searchClient({required String query}) async {
   final uri = Uri.parse(
     '${Global.baseUrl}client/search?nro=${Uri.encodeComponent(query)}',
   );
@@ -891,7 +823,6 @@ Future<Map<String, dynamic>> searchClient({
   final token = GetStorage().read("token");
 
   try {
-
     final response = await http.get(
       uri,
       headers: {
@@ -911,25 +842,13 @@ Future<Map<String, dynamic>> searchClient({
       throw Exception('Sesión expirada');
     }
 
-    if (
-    response.statusCode == 400 ||
-        response.statusCode == 404
-    ) {
-      throw Exception(
-        data['error'] ??
-            'Cliente no encontrado',
-      );
+    if (response.statusCode == 400 || response.statusCode == 404) {
+      throw Exception(data['error'] ?? 'Cliente no encontrado');
     }
 
-    throw Exception(
-      'Error inesperado (${response.statusCode})',
-    );
-
+    throw Exception('Error inesperado (${response.statusCode})');
   } catch (e) {
-
-    print(
-      "ERROR SEARCH CLIENT: $e",
-    );
+    print("ERROR SEARCH CLIENT: $e");
 
     rethrow;
   }

@@ -198,10 +198,8 @@ class Generalcontoller extends GetxController {
         return proveedorRoutes;
 
       case "super administrador":
-        return {
-          SuperadminRoutes.home,
-          ...adminRoutes,
-        };
+        // Mismas paginas que Administrador durante la etapa actual.
+        return adminRoutes;
 
       default:
         return {};

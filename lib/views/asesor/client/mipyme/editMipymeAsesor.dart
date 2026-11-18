@@ -5,6 +5,7 @@ import 'package:finanzas_verdes/app/routes/subrutes/asesorRoutes.dart';
 import 'package:finanzas_verdes/controllers/ClientController.dart';
 import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/models/api/clientApi.dart';
+import 'package:finanzas_verdes/views/asesor/client/mipyme/horarioOperacionEmpresa.dart';
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/models/api/servicesApi.dart';
 import 'package:finanzas_verdes/utils/WidgetsApp.dart';
@@ -19,12 +20,10 @@ class Editmipymeasesor extends StatefulWidget {
   const Editmipymeasesor({super.key});
 
   @override
-  State<Editmipymeasesor> createState() =>
-      _EditmipymeasesorState();
+  State<Editmipymeasesor> createState() => _EditmipymeasesorState();
 }
 
-class _EditmipymeasesorState
-    extends State<Editmipymeasesor> {
+class _EditmipymeasesorState extends State<Editmipymeasesor> {
   final _formKey = GlobalKey<FormState>();
 
   // ✅ CLIENTE
@@ -37,6 +36,7 @@ class _EditmipymeasesorState
   String? selectedMunicipio;
   String? selectedBarrio;
   int? selectedEstrato;
+  // FVE_FACTURA_COMERCIAL_20261114 (estado de seleccion: 0 = comercial, 1..6 = residencial)
   String? selectedTipoEmpresa;
   bool nitEditadoManualmente = false;
 
@@ -53,11 +53,23 @@ class _EditmipymeasesorState
   // final egresosCtrl = TextEditingController();
   final ciiuCtrl = TextEditingController();
   final ciiuDisplayCtrl = TextEditingController();
+  String? _sectorEconomicoSeleccionado;
+  Map<String, dynamic>? _horarioOperacion;
+  // FVE_FIX_CIIU_BARRIO_EDIT_20261113
   String tipoPersona = 'Natural';
 
   bool loading = false;
 
   final ClientController clientController = Get.find<ClientController>();
+
+  String? _catalogoCoincidente(Iterable<String> opciones, String? valor) {
+    final buscado = valor?.trim().toLowerCase();
+    if (buscado == null || buscado.isEmpty) return null;
+    for (final opcion in opciones) {
+      if (opcion.trim().toLowerCase() == buscado) return opcion;
+    }
+    return null;
+  }
 
   void markAsChanged() {
     controller.hasUnsavedChanges.value = true;
@@ -71,6 +83,7 @@ class _EditmipymeasesorState
     descripcionCtrl.removeListener(markAsChanged);
     empleadosCtrl.removeListener(markAsChanged);
     ciiuCtrl.removeListener(markAsChanged);
+    barrioOtroCtrl.removeListener(markAsChanged);
 
     documentoCtrl.dispose();
     nitCtrl.dispose();
@@ -99,14 +112,44 @@ class _EditmipymeasesorState
 
     nombreMipymeCtrl.text = mipyme["nombre_mipyme"]?.toString() ?? '';
     nitCtrl.text = mipyme["nit"]?.toString() ?? '';
-    selectedDepartamento = mipyme["departamento"]?.toString();
-    selectedMunicipio = mipyme["municipio"]?.toString();
-    selectedBarrio = mipyme["barrio"]?.toString();
+    final departamentoGuardado = mipyme['departamento']?.toString().trim();
+    final municipioGuardado = mipyme['municipio']?.toString().trim();
+    selectedDepartamento = _catalogoCoincidente(
+          Global.ubicaciones.keys, departamentoGuardado) ??
+        (departamentoGuardado == null || departamentoGuardado.isEmpty ? null : departamentoGuardado);
+    // Los prospectos antiguos no guardaban departamento. Recuperar la seleccion
+    // solo cuando el municipio identifica un departamento sin ambiguedad.
+    if (selectedDepartamento == null && municipioGuardado != null && municipioGuardado.isNotEmpty) {
+      final coincidentes = Global.ubicaciones.entries.where(
+        (e) => _catalogoCoincidente(e.value.keys, municipioGuardado) != null,
+      ).toList();
+      if (coincidentes.length == 1) selectedDepartamento = coincidentes.first.key;
+    }
+    selectedMunicipio = _catalogoCoincidente(
+          Global.ubicaciones[selectedDepartamento]?.keys ?? <String>[],
+          municipioGuardado) ??
+        (municipioGuardado == null || municipioGuardado.isEmpty ? null : municipioGuardado);
+    final barrioGuardado = mipyme['barrio']?.toString().trim() ?? '';
+    final barriosDisponibles =
+        Global.ubicaciones[selectedDepartamento]?[selectedMunicipio];
+    if (barrioGuardado.isNotEmpty &&
+        !(barriosDisponibles?.contains(barrioGuardado) ?? false)) {
+      selectedBarrio = 'Otro';
+      barrioOtroCtrl.text = barrioGuardado;
+    } else {
+      selectedBarrio = barrioGuardado.isEmpty ? null : barrioGuardado;
+    }
     direccionCtrl.text = mipyme["direccion"]?.toString() ?? '';
     ciiuCtrl.text = mipyme["codigo_ciiu"]?.toString() ?? '';
-    selectedEstrato = mipyme["estrato"] is int
-        ? mipyme["estrato"] as int
-        : int.tryParse(mipyme["estrato"]?.toString() ?? '');
+    _sectorEconomicoSeleccionado = mipyme['sector_economico']?.toString();
+    final horarioGuardado = mipyme['horario_operacion'];
+    _horarioOperacion = horarioGuardado is Map
+        ? Map<String, dynamic>.from(horarioGuardado) : null;
+    selectedEstrato = mipyme['tipo_factura'] == 'Comercial'
+        ? 0
+        : (mipyme["estrato"] is int
+            ? mipyme["estrato"] as int
+            : int.tryParse(mipyme["estrato"]?.toString() ?? ''));
     selectedTipoEmpresa = mipyme["tipo_empresa"]?.toString();
     descripcionCtrl.text = mipyme["descripcion_empresa"]?.toString() ?? '';
     empleadosCtrl.text = mipyme["cantidad_empleados"]?.toString() ?? '';
@@ -118,6 +161,7 @@ class _EditmipymeasesorState
     descripcionCtrl.addListener(markAsChanged);
     empleadosCtrl.addListener(markAsChanged);
     ciiuCtrl.addListener(markAsChanged);
+    barrioOtroCtrl.addListener(markAsChanged);
 
     controller.hasUnsavedChanges.value = false;
     _loadCiiuDisplayName();
@@ -148,10 +192,7 @@ class _EditmipymeasesorState
                     IconButton(
                       onPressed: controller.backPage,
                       tooltip: 'Volver',
-                      icon: const Icon(
-                        CupertinoIcons.back,
-                        size: 21,
-                      ),
+                      icon: const Icon(CupertinoIcons.back, size: 21),
                     ),
 
                     const SizedBox(width: 6),
@@ -189,9 +230,7 @@ class _EditmipymeasesorState
                       ),
                       child: Center(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxWidth: 1400,
-                          ),
+                          constraints: const BoxConstraints(maxWidth: 1400),
                           child: Form(
                             key: _formKey,
                             child: Column(
@@ -216,14 +255,14 @@ class _EditmipymeasesorState
   }
 
   Widget _input(
-      TextEditingController controller,
-      String hint,
-      IconData icon, {
-        bool required = true,
-        TextInputType keyboardType = TextInputType.text,
-        List<TextInputFormatter>? inputFormatters,
-        int maxLines = 1,
-      }) {
+    TextEditingController controller,
+    String hint,
+    IconData icon, {
+    bool required = true,
+    TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
+    int maxLines = 1,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -240,7 +279,8 @@ class _EditmipymeasesorState
             icon,
           ),
           validator: required
-              ? (v) => v == null || v.trim().isEmpty ? 'Campo obligatorio' : null
+              ? (v) =>
+                    v == null || v.trim().isEmpty ? 'Campo obligatorio' : null
               : null,
         ),
       ],
@@ -267,6 +307,7 @@ class _EditmipymeasesorState
         departamento: selectedDepartamento,
         municipio: selectedMunicipio,
         barrio: barrioFinal,
+        sectorEconomico: _sectorEconomicoSeleccionado,
         direccion: direccionCtrl.text.trim().isEmpty
             ? null
             : direccionCtrl.text.trim(),
@@ -278,14 +319,17 @@ class _EditmipymeasesorState
         cantidadEmpleados: empleadosCtrl.text.trim().isEmpty
             ? null
             : int.tryParse(empleadosCtrl.text.trim()),
-        codigoCiiu: ciiuCtrl.text.trim().isEmpty
+        codigoCiiu: ciiuCtrl.text.trim().isEmpty ? null : ciiuCtrl.text.trim(),
+        estrato: selectedEstrato == 0 ? null : selectedEstrato,
+        tipoFactura: selectedEstrato == null
             ? null
-            : ciiuCtrl.text.trim(),
-        estrato: selectedEstrato,
+            : (selectedEstrato == 0 ? 'Comercial' : 'Residencial'),
+        horarioOperacion: _horarioOperacion,
       );
 
       controller.hasUnsavedChanges.value = false;
-      clientController.refreshClient();
+      await clientController.refreshClient();
+      if (!mounted) return;
       controller.backPage();
     } catch (e) {
       Get.snackbar(
@@ -300,12 +344,13 @@ class _EditmipymeasesorState
   }
 
   Widget _inputMoney(
-      TextEditingController controller,
-      String hint,
-      IconData icon,
-      String label,
-      {bool required = false,
-        TextInputType keyboardType = TextInputType.text}) {
+    TextEditingController controller,
+    String hint,
+    IconData icon,
+    String label, {
+    bool required = false,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -335,9 +380,7 @@ class _EditmipymeasesorState
       decoration: BoxDecoration(
         color: Global.container,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Global.text.withOpacity(0.07),
-        ),
+        border: Border.all(color: Global.text.withOpacity(0.07)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -368,9 +411,7 @@ class _EditmipymeasesorState
                     'Documento',
                     Icons.badge_outlined,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
 
                   const SizedBox(height: 6),
@@ -381,19 +422,13 @@ class _EditmipymeasesorState
                       onPressed: documentoCtrl.text.trim().isEmpty
                           ? null
                           : () {
-                        setState(() {
-                          nitEditadoManualmente = false;
-                          nitCtrl.text =
-                              documentoCtrl.text.trim();
-                        });
-                      },
-                      icon: const Icon(
-                        Icons.content_copy_rounded,
-                        size: 17,
-                      ),
-                      label: const Text(
-                        'Usar documento como NIT',
-                      ),
+                              setState(() {
+                                nitEditadoManualmente = false;
+                                nitCtrl.text = documentoCtrl.text.trim();
+                              });
+                            },
+                      icon: const Icon(Icons.content_copy_rounded, size: 17),
+                      label: const Text('Usar documento como NIT'),
                     ),
                   ),
                 ],
@@ -441,11 +476,7 @@ class _EditmipymeasesorState
             color: color.withOpacity(0.12),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            size: 21,
-            color: color,
-          ),
+          child: Icon(icon, size: 21, color: color),
         ),
 
         const SizedBox(width: 12),
@@ -486,9 +517,7 @@ class _EditmipymeasesorState
       decoration: BoxDecoration(
         color: Global.container,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Global.text.withOpacity(0.07),
-        ),
+        border: Border.all(color: Global.text.withOpacity(0.07)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -502,8 +531,7 @@ class _EditmipymeasesorState
         children: [
           _buildSectionHeader(
             title: 'Datos de la mipyme',
-            subtitle:
-            'Actualiza la información general de la empresa',
+            subtitle: 'Conservamos lo registrado en el prospecto; completa únicamente lo pendiente',
             icon: Icons.business_rounded,
             color: const Color(0xFF2E7D5B),
           ),
@@ -525,9 +553,7 @@ class _EditmipymeasesorState
                 Icons.confirmation_number_outlined,
                 required: false,
                 keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
 
               _buildTipoPersonaField(),
@@ -537,6 +563,13 @@ class _EditmipymeasesorState
               _buildMunicipioField(),
 
               _buildBarrioField(),
+
+              if (selectedBarrio == 'Otro')
+                _input(
+                  barrioOtroCtrl,
+                  '¿Cuál es el barrio o la ubicación?',
+                  Icons.edit_location_alt_outlined,
+                ),
 
               _input(
                 direccionCtrl,
@@ -557,13 +590,19 @@ class _EditmipymeasesorState
                 Icons.groups_2_outlined,
                 required: false,
                 keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
             ],
           ),
 
+          const SizedBox(height: 16),
+          HorarioOperacionEmpresa(
+            inicial: _horarioOperacion,
+            onChanged: (v) {
+              _horarioOperacion = v;
+              markAsChanged();
+            },
+          ),
           const SizedBox(height: 16),
 
           // La descripción aprovecha todo el ancho.
@@ -581,23 +620,29 @@ class _EditmipymeasesorState
 
   Widget _buildEstratoField() {
     return _labeledField(
-      label: 'Estrato',
+      label: 'Estrato o tipo de factura',
       optional: true,
       child: DropdownButtonFormField<int>(
         value: selectedEstrato,
         isExpanded: true,
         decoration: _formDecoration(
-          hint: 'Seleccionar estrato',
+          hint: 'Estrato o factura comercial',
           icon: Icons.layers_outlined,
         ),
-        items: List.generate(6, (index) {
+        items: [
+          const DropdownMenuItem<int>(
+            value: 0,
+            child: Text('Factura comercial (sin estrato)'),
+          ),
+          ...List.generate(6, (index) {
           final int estrato = index + 1;
 
           return DropdownMenuItem<int>(
             value: estrato,
             child: Text('Estrato $estrato'),
           );
-        }),
+          }),
+        ],
         onChanged: (value) {
           setState(() {
             selectedEstrato = value;
@@ -618,7 +663,12 @@ class _EditmipymeasesorState
           hint: 'Seleccionar departamento',
           icon: Icons.map_outlined,
         ),
-        items: Global.ubicaciones.keys.map((departamento) {
+        items: <String>[
+          ...Global.ubicaciones.keys,
+          if (selectedDepartamento != null &&
+              !Global.ubicaciones.containsKey(selectedDepartamento))
+            selectedDepartamento!,
+        ].map((departamento) {
           return DropdownMenuItem<String>(
             value: departamento,
             child: Text(
@@ -641,12 +691,12 @@ class _EditmipymeasesorState
   }
 
   Widget _buildMunicipioField() {
-    final List<String> municipios =
-    selectedDepartamento == null
+    final List<String> municipios = selectedDepartamento == null
         ? <String>[]
-        : Global.ubicaciones[selectedDepartamento!]!
-        .keys
-        .toList();
+        : (Global.ubicaciones[selectedDepartamento]?.keys.toList() ?? <String>[]);
+    if (selectedMunicipio != null && !municipios.contains(selectedMunicipio)) {
+      municipios.add(selectedMunicipio!);
+    }
 
     final bool enabled = selectedDepartamento != null;
 
@@ -675,27 +725,29 @@ class _EditmipymeasesorState
         onChanged: !enabled
             ? null
             : (value) {
-          setState(() {
-            selectedMunicipio = value;
-            selectedBarrio = null;
-          });
-          markAsChanged();
-        },
+                setState(() {
+                  selectedMunicipio = value;
+                  selectedBarrio = null;
+                });
+                markAsChanged();
+              },
       ),
     );
   }
 
   Widget _buildBarrioField() {
     final bool enabled =
-        selectedDepartamento != null &&
-            selectedMunicipio != null;
+        selectedDepartamento != null && selectedMunicipio != null;
 
     final List<String> barrios = !enabled
         ? <String>[]
         : List<String>.from(
-      Global.ubicaciones[selectedDepartamento!]![
-      selectedMunicipio!]!,
-    );
+            Global.ubicaciones[selectedDepartamento]?[selectedMunicipio] ?? <String>[],
+          );
+    if (enabled && !barrios.contains('Otro')) barrios.add('Otro');
+    if (selectedBarrio != null && !barrios.contains(selectedBarrio)) {
+      barrios.add(selectedBarrio!);
+    }
 
     return _labeledField(
       label: 'Barrio',
@@ -704,30 +756,24 @@ class _EditmipymeasesorState
         value: selectedBarrio,
         isExpanded: true,
         decoration: _formDecoration(
-          hint: enabled
-              ? 'Seleccionar barrio'
-              : 'Primero selecciona municipio',
+          hint: enabled ? 'Seleccionar barrio' : 'Primero selecciona municipio',
           icon: Icons.location_on_outlined,
           enabled: enabled,
         ),
         items: barrios.map((barrio) {
           return DropdownMenuItem<String>(
             value: barrio,
-            child: Text(
-              barrio,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(barrio, maxLines: 1, overflow: TextOverflow.ellipsis),
           );
         }).toList(),
         onChanged: !enabled
             ? null
             : (value) {
-          setState(() {
-            selectedBarrio = value;
-          });
-          markAsChanged();
-        },
+                setState(() {
+                  selectedBarrio = value;
+                });
+                markAsChanged();
+              },
       ),
     );
   }
@@ -738,40 +784,33 @@ class _EditmipymeasesorState
         final bool isMobile = constraints.maxWidth < 600;
 
         return Align(
-          alignment: isMobile
-              ? Alignment.center
-              : Alignment.centerRight,
+          alignment: isMobile ? Alignment.center : Alignment.centerRight,
           child: SizedBox(
             width: isMobile ? double.infinity : 240,
             height: 52,
-            child: ElevatedButton.icon(
-              onPressed: loading ||
-                  !controller.hasUnsavedChanges.value
-                  ? null
-                  : _submit,
-              icon: loading
-                  ? const SizedBox(
-                width: 19,
-                height: 19,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-                  : const Icon(
-                Icons.save_outlined,
-              ),
-              label: Text(
-                loading
-                    ? 'Guardando...'
-                    : 'Guardar cambios',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Global.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+            child: Obx(
+              () => ElevatedButton.icon(
+                onPressed: loading || !controller.hasUnsavedChanges.value
+                    ? null
+                    : _submit,
+                icon: loading
+                    ? const SizedBox(
+                        width: 19,
+                        height: 19,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: Text(loading ? 'Guardando...' : 'Guardar cambios'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Global.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),
@@ -798,21 +837,16 @@ class _EditmipymeasesorState
 
         Container(
           width: double.infinity,
-          constraints: const BoxConstraints(
-            minHeight: 56,
-          ),
+          constraints: const BoxConstraints(minHeight: 56),
           padding: const EdgeInsets.all(5),
           decoration: BoxDecoration(
             color: Global.bg.withOpacity(0.55),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Global.text.withOpacity(0.10),
-            ),
+            border: Border.all(color: Global.text.withOpacity(0.10)),
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final bool compact =
-                  constraints.maxWidth < 240;
+              final bool compact = constraints.maxWidth < 240;
 
               if (compact) {
                 return Column(
@@ -880,10 +914,7 @@ class _EditmipymeasesorState
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 10,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
             color: isSelected
                 ? Global.primary.withOpacity(0.14)
@@ -901,9 +932,7 @@ class _EditmipymeasesorState
               Icon(
                 icon,
                 size: 18,
-                color: isSelected
-                    ? Global.primary
-                    : Global.textSecondary,
+                color: isSelected ? Global.primary : Global.textSecondary,
               ),
 
               const SizedBox(width: 7),
@@ -915,12 +944,8 @@ class _EditmipymeasesorState
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: 12,
-                    fontWeight: isSelected
-                        ? FontWeight.w600
-                        : FontWeight.w400,
-                    color: isSelected
-                        ? Global.primary
-                        : Global.textSecondary,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected ? Global.primary : Global.textSecondary,
                   ),
                 ),
               ),
@@ -945,11 +970,7 @@ class _EditmipymeasesorState
         items: Global.tiposEmpresa.map((tipo) {
           return DropdownMenuItem<String>(
             value: tipo,
-            child: Text(
-              tipo,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(tipo, maxLines: 1, overflow: TextOverflow.ellipsis),
           );
         }).toList(),
         onChanged: (value) {
@@ -970,20 +991,14 @@ class _EditmipymeasesorState
         controller: ciiuDisplayCtrl,
         readOnly: true,
         onTap: _openCiiuSelector,
-        style: GoogleFonts.poppins(
-          fontSize: 13,
-          color: Global.text,
-        ),
+        style: GoogleFonts.poppins(fontSize: 13, color: Global.text),
         decoration: _formDecoration(
           hint: 'Seleccionar actividad económica',
           icon: Icons.account_tree_outlined,
           suffixIcon: IconButton(
             onPressed: _openCiiuSelector,
             tooltip: 'Buscar actividad económica',
-            icon: Icon(
-              Icons.search_rounded,
-              color: Global.primary,
-            ),
+            icon: Icon(Icons.search_rounded, color: Global.primary),
           ),
         ),
       ),
@@ -1012,16 +1027,20 @@ class _EditmipymeasesorState
         }
       }
 
-      if (match == null || !mounted) return;
+      if (match == null || !mounted || ciiuCtrl.text.trim() != codigo) return;
 
       final String nombre =
           match['nombre']?.toString() ??
-              match['descripcion']?.toString() ??
-              match['actividad']?.toString() ??
-              codigo;
+          match['descripcion']?.toString() ??
+          match['actividad']?.toString() ??
+          codigo;
 
       setState(() {
         ciiuDisplayCtrl.text = nombre;
+        if (_sectorEconomicoSeleccionado == null ||
+            _sectorEconomicoSeleccionado!.trim().isEmpty) {
+          _sectorEconomicoSeleccionado = nombre;
+        }
       });
     } catch (_) {
       // Si la consulta falla, conserva el código existente.
@@ -1029,7 +1048,10 @@ class _EditmipymeasesorState
   }
 
   Future<void> _openCiiuSelector() async {
-    final searchCtrl = TextEditingController();
+    final searchFieldKey = GlobalKey<FormFieldState<String>>();
+    final searchQuery = ''.obs;
+    bool dialogActivo = true;
+    int versionBusqueda = 0;
 
     final RxList<dynamic> results = <dynamic>[].obs;
     final RxBool searching = false.obs;
@@ -1037,7 +1059,9 @@ class _EditmipymeasesorState
     Timer? debounce;
 
     Future<void> doSearch(String query) async {
+      if (!dialogActivo) return;
       final normalizedQuery = query.trim();
+      final solicitud = ++versionBusqueda;
 
       if (normalizedQuery.isEmpty) {
         results.clear();
@@ -1048,12 +1072,12 @@ class _EditmipymeasesorState
       searching.value = true;
 
       try {
-        final data = await searchCiiuApi(
-          query: normalizedQuery,
-        );
+        final data = await searchCiiuApi(query: normalizedQuery);
 
+        if (!dialogActivo || !mounted || solicitud != versionBusqueda) return;
         results.assignAll(data);
       } catch (error) {
+        if (!dialogActivo || !mounted || solicitud != versionBusqueda) return;
         results.clear();
 
         Get.snackbar(
@@ -1062,8 +1086,9 @@ class _EditmipymeasesorState
           snackPosition: SnackPosition.BOTTOM,
         );
       } finally {
-        // Aquí no se destruye ningún controller.
-        searching.value = false;
+        if (dialogActivo && solicitud == versionBusqueda) {
+          searching.value = false;
+        }
       }
     }
 
@@ -1096,20 +1121,15 @@ class _EditmipymeasesorState
                         end: Alignment.bottomRight,
                         colors: isDark
                             ? [
-                          const Color(0xFF153240)
-                              .withOpacity(0.88),
-                          const Color(0xFF071C29)
-                              .withOpacity(0.82),
-                          const Color(0xFF0A2431)
-                              .withOpacity(0.90),
-                        ]
+                                const Color(0xFF153240).withOpacity(0.88),
+                                const Color(0xFF071C29).withOpacity(0.82),
+                                const Color(0xFF0A2431).withOpacity(0.90),
+                              ]
                             : [
-                          Colors.white.withOpacity(0.96),
-                          const Color(0xFFF5F8FA)
-                              .withOpacity(0.92),
-                          const Color(0xFFE7EFF3)
-                              .withOpacity(0.94),
-                        ],
+                                Colors.white.withOpacity(0.96),
+                                const Color(0xFFF5F8FA).withOpacity(0.92),
+                                const Color(0xFFE7EFF3).withOpacity(0.94),
+                              ],
                       ),
 
                       border: Border.all(
@@ -1123,8 +1143,7 @@ class _EditmipymeasesorState
                         BoxShadow(
                           color: isDark
                               ? Colors.black.withOpacity(0.40)
-                              : const Color(0xFF486674)
-                              .withOpacity(0.16),
+                              : const Color(0xFF486674).withOpacity(0.16),
                           blurRadius: isDark ? 34 : 28,
                           offset: const Offset(0, -8),
                         ),
@@ -1165,33 +1184,28 @@ class _EditmipymeasesorState
                           child: IgnorePointer(
                             child: DecoratedBox(
                               decoration: BoxDecoration(
-                                borderRadius:
-                                const BorderRadius.vertical(
+                                borderRadius: const BorderRadius.vertical(
                                   top: Radius.circular(24),
                                 ),
                                 gradient: LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
-                                  stops: const [
-                                    0.0,
-                                    0.28,
-                                    0.55,
-                                    1.0,
-                                  ],
+                                  stops: const [0.0, 0.28, 0.55, 1.0],
                                   colors: isDark
                                       ? [
-                                    Colors.white.withOpacity(0.05),
-                                    Colors.transparent,
-                                    Colors.transparent,
-                                    Global.primary.withOpacity(0.025),
-                                  ]
+                                          Colors.white.withOpacity(0.05),
+                                          Colors.transparent,
+                                          Colors.transparent,
+                                          Global.primary.withOpacity(0.025),
+                                        ]
                                       : [
-                                    Colors.white.withOpacity(0.75),
-                                    Colors.white.withOpacity(0.15),
-                                    Colors.transparent,
-                                    const Color(0xFFB6CAD3)
-                                        .withOpacity(0.10),
-                                  ],
+                                          Colors.white.withOpacity(0.75),
+                                          Colors.white.withOpacity(0.15),
+                                          Colors.transparent,
+                                          const Color(
+                                            0xFFB6CAD3,
+                                          ).withOpacity(0.10),
+                                        ],
                                 ),
                               ),
                             ),
@@ -1199,12 +1213,7 @@ class _EditmipymeasesorState
                         ),
 
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            18,
-                            12,
-                            18,
-                            18,
-                          ),
+                          padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
                           child: Column(
                             children: [
                               // Indicador para arrastrar.
@@ -1215,8 +1224,7 @@ class _EditmipymeasesorState
                                   color: isDark
                                       ? Colors.white.withOpacity(0.24)
                                       : Global.text.withOpacity(0.18),
-                                  borderRadius:
-                                  BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
                               ),
 
@@ -1232,8 +1240,7 @@ class _EditmipymeasesorState
                                       color: Global.primary.withOpacity(
                                         isDark ? 0.18 : 0.11,
                                       ),
-                                      borderRadius:
-                                      BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                         color: Global.primary.withOpacity(
                                           isDark ? 0.22 : 0.13,
@@ -1251,14 +1258,13 @@ class _EditmipymeasesorState
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Seleccionar código CIIU',
                                           style: GoogleFonts.poppins(
                                             fontSize: 16,
-                                            fontWeight:
-                                            FontWeight.w600,
+                                            fontWeight: FontWeight.w600,
                                             color: Global.text,
                                           ),
                                         ),
@@ -1267,8 +1273,7 @@ class _EditmipymeasesorState
                                           'Busca por código o actividad económica',
                                           style: GoogleFonts.poppins(
                                             fontSize: 11,
-                                            color:
-                                            Global.textSecondary,
+                                            color: Global.textSecondary,
                                           ),
                                         ),
                                       ],
@@ -1294,23 +1299,22 @@ class _EditmipymeasesorState
                               const SizedBox(height: 16),
 
                               // Buscador.
-                              TextField(
-                                controller: searchCtrl,
+                              TextFormField(
+                                key: searchFieldKey,
                                 autofocus: true,
-                                textInputAction:
-                                TextInputAction.search,
-                                onSubmitted: doSearch,
+                                textInputAction: TextInputAction.search,
+                                onFieldSubmitted: doSearch,
                                 onChanged: (value) {
+                                  searchQuery.value = value;
+                                  versionBusqueda++;
                                   // Fuerza la actualización del estado vacío.
                                   searching.refresh();
 
                                   debounce?.cancel();
 
                                   debounce = Timer(
-                                    const Duration(
-                                      milliseconds: 350,
-                                    ),
-                                        () => doSearch(value),
+                                    const Duration(milliseconds: 350),
+                                    () => doSearch(value),
                                   );
                                 },
                                 style: GoogleFonts.poppins(
@@ -1318,8 +1322,7 @@ class _EditmipymeasesorState
                                   color: Global.text,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText:
-                                  'Buscar actividad o código',
+                                  hintText: 'Buscar actividad o código',
                                   hintStyle: GoogleFonts.poppins(
                                     fontSize: 13,
                                     color: Global.textSecondary,
@@ -1328,47 +1331,45 @@ class _EditmipymeasesorState
                                     Icons.search_rounded,
                                     color: Global.primary,
                                   ),
-                                  suffixIcon:
-                                  searchCtrl.text.isNotEmpty
+                                  suffixIcon: searchQuery.value.isNotEmpty
                                       ? IconButton(
-                                    tooltip:
-                                    'Limpiar búsqueda',
-                                    onPressed: () {
-                                      debounce?.cancel();
-                                      searchCtrl.clear();
-                                      results.clear();
-                                      searching.refresh();
-                                    },
-                                    icon: Icon(
-                                      Icons.close_rounded,
-                                      size: 19,
-                                      color:
-                                      Global.textSecondary,
-                                    ),
-                                  )
+                                          tooltip: 'Limpiar búsqueda',
+                                          onPressed: () {
+                                            debounce?.cancel();
+                                            searchFieldKey.currentState
+                                                ?.reset();
+                                            searchQuery.value = '';
+                                            versionBusqueda++;
+                                            results.clear();
+                                            searching.refresh();
+                                          },
+                                          icon: Icon(
+                                            Icons.close_rounded,
+                                            size: 19,
+                                            color: Global.textSecondary,
+                                          ),
+                                        )
                                       : null,
                                   filled: true,
                                   fillColor: isDark
                                       ? Colors.black.withOpacity(0.16)
                                       : Colors.white.withOpacity(0.72),
-                                  contentPadding:
-                                  const EdgeInsets.symmetric(
+                                  contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 15,
                                     vertical: 15,
                                   ),
                                   enabledBorder: OutlineInputBorder(
-                                    borderRadius:
-                                    BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(14),
                                     borderSide: BorderSide(
                                       color: isDark
                                           ? Colors.white.withOpacity(0.10)
-                                          : const Color(0xFF78909C)
-                                          .withOpacity(0.22),
+                                          : const Color(
+                                              0xFF78909C,
+                                            ).withOpacity(0.22),
                                     ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
-                                    borderRadius:
-                                    BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(14),
                                     borderSide: BorderSide(
                                       color: Global.primary,
                                       width: 1.5,
@@ -1384,70 +1385,55 @@ class _EditmipymeasesorState
                                 child: Obx(() {
                                   if (searching.value) {
                                     return Center(
-                                      child:
-                                      CircularProgressIndicator(
+                                      child: CircularProgressIndicator(
                                         color: Global.primary,
                                       ),
                                     );
                                   }
 
-                                  if (searchCtrl.text
-                                      .trim()
-                                      .isEmpty) {
+                                  if (searchQuery.value.trim().isEmpty) {
                                     return _buildCiiuMessage(
                                       icon: Icons.search_rounded,
-                                      title:
-                                      'Busca una actividad económica',
+                                      title: 'Busca una actividad económica',
                                       description:
-                                      'Escribe una palabra o un código para comenzar.',
+                                          'Escribe una palabra o un código para comenzar.',
                                     );
                                   }
 
                                   if (results.isEmpty) {
                                     return _buildCiiuMessage(
-                                      icon:
-                                      Icons.search_off_rounded,
+                                      icon: Icons.search_off_rounded,
                                       title: 'Sin resultados',
                                       description:
-                                      'Intenta con otra actividad o código.',
+                                          'Intenta con otra actividad o código.',
                                     );
                                   }
 
                                   return ListView.separated(
                                     keyboardDismissBehavior:
-                                    ScrollViewKeyboardDismissBehavior
-                                        .onDrag,
-                                    padding:
-                                    const EdgeInsets.only(top: 2),
+                                        ScrollViewKeyboardDismissBehavior
+                                            .onDrag,
+                                    padding: const EdgeInsets.only(top: 2),
                                     itemCount: results.length,
-                                    separatorBuilder: (_, __) =>
-                                        Divider(
-                                          height: 1,
-                                          indent: 70,
-                                          color: Global.text
-                                              .withOpacity(0.08),
-                                        ),
+                                    separatorBuilder: (_, __) => Divider(
+                                      height: 1,
+                                      indent: 70,
+                                      color: Global.text.withOpacity(0.08),
+                                    ),
                                     itemBuilder: (context, index) {
-                                      final item =
-                                      results[index];
+                                      final item = results[index];
 
                                       final String codigo =
-                                          item['codigo']
-                                              ?.toString() ??
-                                              '';
+                                          item['codigo']?.toString() ?? '';
 
                                       final String nombre =
-                                          item['nombre']
-                                              ?.toString() ??
-                                              item['descripcion']
-                                                  ?.toString() ??
-                                              item['actividad']
-                                                  ?.toString() ??
-                                              'Sin descripción';
+                                          item['nombre']?.toString() ??
+                                          item['descripcion']?.toString() ??
+                                          item['actividad']?.toString() ??
+                                          'Sin descripción';
 
                                       final bool selected =
-                                          ciiuCtrl.text.trim() ==
-                                              codigo;
+                                          ciiuCtrl.text.trim() == codigo;
 
                                       return Material(
                                         color: Colors.transparent,
@@ -1455,48 +1441,42 @@ class _EditmipymeasesorState
                                           onTap: () {
                                             debounce?.cancel();
 
+                                            dialogActivo = false;
+                                            versionBusqueda++;
                                             setState(() {
-                                              // Código enviado a la API.
-                                              ciiuCtrl.text =
-                                                  codigo;
-
-                                              // Actividad visible.
-                                              ciiuDisplayCtrl
-                                                  .text = nombre;
+                                              ciiuCtrl.text = codigo;
+                                              ciiuDisplayCtrl.text = nombre;
+                                              _sectorEconomicoSeleccionado =
+                                                  nombre == 'Sin descripción'
+                                                  ? null
+                                                  : nombre;
                                             });
 
                                             Get.back();
                                           },
-                                          borderRadius:
-                                          BorderRadius.circular(
+                                          borderRadius: BorderRadius.circular(
                                             13,
                                           ),
                                           child: AnimatedContainer(
                                             duration: const Duration(
                                               milliseconds: 180,
                                             ),
-                                            padding:
-                                            const EdgeInsets.symmetric(
+                                            padding: const EdgeInsets.symmetric(
                                               horizontal: 8,
                                               vertical: 8,
                                             ),
                                             decoration: BoxDecoration(
                                               color: selected
-                                                  ? Global.primary
-                                                  .withOpacity(
-                                                isDark
-                                                    ? 0.14
-                                                    : 0.09,
-                                              )
+                                                  ? Global.primary.withOpacity(
+                                                      isDark ? 0.14 : 0.09,
+                                                    )
                                                   : Colors.transparent,
                                               borderRadius:
-                                              BorderRadius.circular(
-                                                13,
-                                              ),
+                                                  BorderRadius.circular(13),
                                               border: Border.all(
                                                 color: selected
                                                     ? Global.primary
-                                                    .withOpacity(0.28)
+                                                          .withOpacity(0.28)
                                                     : Colors.transparent,
                                               ),
                                             ),
@@ -1505,49 +1485,40 @@ class _EditmipymeasesorState
                                                 Container(
                                                   width: 58,
                                                   height: 42,
-                                                  alignment:
-                                                  Alignment.center,
-                                                  decoration:
-                                                  BoxDecoration(
+                                                  alignment: Alignment.center,
+                                                  decoration: BoxDecoration(
                                                     color: Global.primary
                                                         .withOpacity(
-                                                      isDark
-                                                          ? 0.17
-                                                          : 0.10,
-                                                    ),
+                                                          isDark ? 0.17 : 0.10,
+                                                        ),
                                                     borderRadius:
-                                                    BorderRadius
-                                                        .circular(11),
+                                                        BorderRadius.circular(
+                                                          11,
+                                                        ),
                                                   ),
                                                   child: Text(
                                                     codigo,
                                                     maxLines: 1,
-                                                    overflow: TextOverflow
-                                                        .ellipsis,
-                                                    style:
-                                                    GoogleFonts.poppins(
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: GoogleFonts.poppins(
                                                       fontSize: 11,
                                                       fontWeight:
-                                                      FontWeight.w600,
-                                                      color:
-                                                      Global.primary,
+                                                          FontWeight.w600,
+                                                      color: Global.primary,
                                                     ),
                                                   ),
                                                 ),
 
-                                                const SizedBox(
-                                                  width: 12,
-                                                ),
+                                                const SizedBox(width: 12),
 
                                                 Expanded(
                                                   child: Text(
                                                     nombre,
                                                     maxLines: 2,
                                                     overflow:
-                                                    TextOverflow
-                                                        .ellipsis,
-                                                    style:
-                                                    GoogleFonts.poppins(
+                                                        TextOverflow.ellipsis,
+                                                    style: GoogleFonts.poppins(
                                                       fontSize: 12.5,
                                                       height: 1.35,
                                                       fontWeight: selected
@@ -1562,17 +1533,13 @@ class _EditmipymeasesorState
 
                                                 if (selected)
                                                   Icon(
-                                                    Icons
-                                                        .check_circle_rounded,
-                                                    color:
-                                                    Global.primary,
+                                                    Icons.check_circle_rounded,
+                                                    color: Global.primary,
                                                   )
                                                 else
                                                   Icon(
-                                                    Icons
-                                                        .chevron_right_rounded,
-                                                    color: Global
-                                                        .textSecondary,
+                                                    Icons.chevron_right_rounded,
+                                                    color: Global.textSecondary,
                                                   ),
                                               ],
                                             ),
@@ -1600,21 +1567,19 @@ class _EditmipymeasesorState
         backgroundColor: Colors.transparent,
       );
     } finally {
+      dialogActivo = false;
+      versionBusqueda++;
       debounce?.cancel();
-      searchCtrl.dispose();
     }
   }
 
   void _onDocumentoChanged() {
     final String documento = documentoCtrl.text.trim();
 
-    if (!nitEditadoManualmente &&
-        nitCtrl.text != documento) {
+    if (!nitEditadoManualmente && nitCtrl.text != documento) {
       nitCtrl.value = TextEditingValue(
         text: documento,
-        selection: TextSelection.collapsed(
-          offset: documento.length,
-        ),
+        selection: TextSelection.collapsed(offset: documento.length),
       );
     }
 
@@ -1643,11 +1608,7 @@ class _EditmipymeasesorState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 42,
-              color: Global.text.withOpacity(0.25),
-            ),
+            Icon(icon, size: 42, color: Global.text.withOpacity(0.25)),
             const SizedBox(height: 12),
             Text(
               title,
@@ -1679,15 +1640,12 @@ class _EditmipymeasesorState
     bool enabled = true,
     Widget? suffixIcon,
   }) {
-    final Color borderColor =
-    Global.text.withOpacity(enabled ? 0.13 : 0.07);
+    final Color borderColor = Global.text.withOpacity(enabled ? 0.13 : 0.07);
     return InputDecoration(
       hintText: hint,
       hintStyle: GoogleFonts.poppins(
         fontSize: 13,
-        color: Global.textSecondary.withOpacity(
-          enabled ? 0.90 : 0.55,
-        ),
+        color: Global.textSecondary.withOpacity(enabled ? 0.90 : 0.55),
       ),
       prefixIcon: Icon(
         icon,
@@ -1701,41 +1659,26 @@ class _EditmipymeasesorState
       fillColor: enabled
           ? Global.bg.withOpacity(0.55)
           : Global.bg.withOpacity(0.28),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(13),
-        borderSide: BorderSide(
-          color: borderColor,
-        ),
+        borderSide: BorderSide(color: borderColor),
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(13),
-        borderSide: BorderSide(
-          color: borderColor,
-        ),
+        borderSide: BorderSide(color: borderColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(13),
-        borderSide: BorderSide(
-          color: Global.primary,
-          width: 1.4,
-        ),
+        borderSide: BorderSide(color: Global.primary, width: 1.4),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(13),
-        borderSide: const BorderSide(
-          color: Colors.red,
-        ),
+        borderSide: const BorderSide(color: Colors.red),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(13),
-        borderSide: const BorderSide(
-          color: Colors.red,
-          width: 1.4,
-        ),
+        borderSide: const BorderSide(color: Colors.red, width: 1.4),
       ),
     );
   }
@@ -1818,18 +1761,14 @@ class ResponsiveFormGrid extends StatelessWidget {
         }
 
         final double fieldWidth =
-            (availableWidth - (spacing * (columns - 1))) /
-                columns;
+            (availableWidth - (spacing * (columns - 1))) / columns;
 
         return Wrap(
           spacing: spacing,
           runSpacing: runSpacing,
           crossAxisAlignment: WrapCrossAlignment.start,
           children: children.map((child) {
-            return SizedBox(
-              width: fieldWidth,
-              child: child,
-            );
+            return SizedBox(width: fieldWidth, child: child);
           }).toList(),
         );
       },

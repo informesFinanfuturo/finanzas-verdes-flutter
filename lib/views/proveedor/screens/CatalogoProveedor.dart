@@ -165,6 +165,7 @@ class _CatalogoproveedorState extends State<Catalogoproveedor> {
                                         borderRadius: BorderRadius.circular(10),
                                         child: Image.network(
                                           url,
+                  headers: Utils.imageHeaders,
                                           width: 160,
                                           height: 170,
                                           fit: BoxFit.cover,

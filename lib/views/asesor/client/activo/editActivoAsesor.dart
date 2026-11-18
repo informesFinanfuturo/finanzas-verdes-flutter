@@ -2,6 +2,9 @@ import 'package:finanzas_verdes/app/routes/subrutes/asesorRoutes.dart';
 import 'package:finanzas_verdes/controllers/ClientController.dart';
 import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/models/api/activoApi.dart';
+import 'package:finanzas_verdes/models/api/fveInventarioApi.dart';
+import 'package:finanzas_verdes/views/asesor/client/activo/fichaTecnicaVerdeActivo.dart';
+import 'package:finanzas_verdes/views/asesor/client/activo/perfilUsoActivo.dart';
 import 'package:finanzas_verdes/models/api/clientApi.dart';
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/utils/WidgetsApp.dart';
@@ -12,6 +15,7 @@ import 'package:finanzas_verdes/views/asesor/client/viewOneImageAsesorCliente.da
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -36,6 +40,8 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
   final modeloCtrl = TextEditingController();
   final cantidadCtrl = TextEditingController();
   bool loading = false;
+  Map<String, dynamic>? _datosTecnicosFve;
+  Map<String, dynamic>? _perfilUso;
 
   XFile? selectedImage;
   bool uploadingImage = false;
@@ -43,6 +49,11 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
   final clientController = Get.find<ClientController>();
 
   bool analyzingWithAI = false;
+  bool _buscandoReferencias = false;
+  Map<String, dynamic>? _estadoReferencias;
+  Map<String, dynamic>? _ultimoReporteBusquedaFve; // FVE_REPORTE_VISIBLE_CRAWLER_V1
+  bool _ultimoReporteGuardadoFve = false;
+  int _revisionFveIA = 0;
   bool _isAiExpanded = false;
 
   @override
@@ -59,6 +70,10 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
     super.initState();
 
     final activo = clientController.Activo;
+    final datosActivo = activo['datos'];
+    final perfilGuardado = datosActivo is Map ? datosActivo['fve_perfil_uso'] : null;
+    _perfilUso = perfilGuardado is Map
+        ? Map<String, dynamic>.from(perfilGuardado) : null;
 
     nombreCtrl.text =
         activo["nombre"]?.toString() ?? '';
@@ -88,14 +103,33 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
     marcaCtrl.addListener(_markAsChanged);
     modeloCtrl.addListener(_markAsChanged);
     cantidadCtrl.addListener(_markAsChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _cargarEstadoReferencias());
   }
 
+  // No notificar al padre mientras Flutter construye _FormScope.
+  // El indicador global es observable; no requiere setState local.
+  bool _markChangeAfterFrame = false;
+
   void _markAsChanged() {
-    if (!controller.hasUnsavedChanges.value) {
-      setState(() {
+    if (!mounted || loading || uploadingImage ||
+        controller.hasUnsavedChanges.value) return;
+
+    // Un TextFormField o la ficha FVE pueden avisar durante build.
+    // Posponer el cambio evita setState/markNeedsBuild durante el render.
+    if (WidgetsBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      if (_markChangeAfterFrame) return;
+      _markChangeAfterFrame = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _markChangeAfterFrame = false;
+        if (!mounted || loading || uploadingImage ||
+            controller.hasUnsavedChanges.value) return;
         controller.hasUnsavedChanges.value = true;
       });
+      return;
     }
+
+    controller.hasUnsavedChanges.value = true;
   }
 
   @override
@@ -120,7 +154,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
                 controller.hasUnsavedChanges.value,
                 loading: loading,
                 onBack: controller.backPage,
-                onSave: loading ? null : _submit,
+                onSave: (loading || uploadingImage) ? null : _submit,
               ),
 
               const Divider(height: 1),
@@ -206,6 +240,11 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
             hint,
             icon,
           ),
+          validator: required
+              ? (value) => value == null || value.trim().isEmpty
+                  ? 'Campo obligatorio'
+                  : null
+              : null,
         ),
       ],
     );
@@ -237,43 +276,97 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
     );
   }
 
+  // Alta y edicion comparten esta misma pantalla. No se crea un activo
+  // hasta pulsar Guardar o Subir imagen.
+  Future<int> _asegurarActivoCreado() async {
+    final existente = int.tryParse(
+      '${clientController.Activo['id_activo'] ?? ''}',
+    );
+    if (existente != null && existente > 0) return existente;
+
+    final nombre = nombreCtrl.text.trim();
+    final tipo = tipoSeleccionado?.trim();
+    if (nombre.isEmpty || tipo == null || tipo.isEmpty) {
+      throw StateError('Indica el nombre y el tipo de activo antes de continuar.');
+    }
+
+    final nuevo = await createActivoApi(
+      nombre: nombre,
+      tipo: tipo,
+      idMipyme: clientController.Client['mipyme']['id_mipyme'],
+      marca: marcaCtrl.text.trim(),
+      modelo: modeloCtrl.text.trim().isEmpty ? null : modeloCtrl.text.trim(),
+      descripcion: descripcionCtrl.text.trim().isEmpty
+          ? null
+          : descripcionCtrl.text.trim(),
+      perfilUso: _perfilUso,
+    );
+
+    final idNuevo = int.tryParse('${nuevo['id_activo'] ?? ''}');
+    if (idNuevo == null || idNuevo <= 0) {
+      throw StateError('La API no devolvio el ID del activo creado.');
+    }
+
+    // Registrar de inmediato el ID para evitar duplicados ante un error
+    // posterior de actualizacion, ficha tecnica o carga de fotografia.
+    clientController.setActivo(Map<String, dynamic>.from(nuevo));
+    return idNuevo;
+  }
+
+  Future<void> _guardarDatosDelActivo(
+    int idActivo,
+    Map<String, dynamic>? datosTecnicosPendientes,
+  ) async {
+    await updateActivoApi(
+      idActivo: idActivo,
+      updatedBy: controller.User['id_usuario'],
+      nombre: nombreCtrl.text.trim(),
+      tipo: tipoSeleccionado,
+      descripcion: descripcionCtrl.text.trim().isEmpty
+          ? null
+          : descripcionCtrl.text.trim(),
+      marca: marcaCtrl.text.trim(),
+      modelo: modeloCtrl.text.trim(),
+      cantidad: int.parse(cantidadCtrl.text.trim()),
+      perfilUso: _perfilUso,
+    );
+
+    if (datosTecnicosPendientes != null) {
+      await guardarInventarioFveApi(
+        idActivo: idActivo,
+        datosTecnicos: datosTecnicosPendientes,
+      );
+    }
+  }
+
   Future<void> _submit() async {
+    if (loading || uploadingImage) return;
     if (!_formKey.currentState!.validate()) return;
 
+    // El cambio de idActivo al crear provoca una recarga de la ficha FVE.
+    // Conservar antes los datos escritos para no perderlos durante esa recarga.
+    final datosPendientes = _datosTecnicosFve == null
+        ? null
+        : Map<String, dynamic>.from(_datosTecnicosFve!);
+
     setState(() => loading = true);
-
     try {
-      final clientController = Get.find<ClientController>();
-      final activo = Get.find<ClientController>().Activo;
+      final idActivo = await _asegurarActivoCreado();
+      await _guardarDatosDelActivo(idActivo, datosPendientes);
 
-      await updateActivoApi(
-        idActivo: activo["id_activo"],
-        updatedBy: controller.User["id_usuario"],
-
-        nombre: nombreCtrl.text,
-        tipo: tipoSeleccionado,
-        descripcion: descripcionCtrl.text.isEmpty
-            ? null
-            : descripcionCtrl.text,
-        marca: marcaCtrl.text,
-        modelo: modeloCtrl.text,
-        cantidad: int.tryParse(cantidadCtrl.text) ?? 1,
-      );
-
+      clientController.setActivo(await getActivoApi(idActivo: idActivo));
+      await clientController.refreshClient();
       controller.hasUnsavedChanges.value = false;
 
-      clientController.refreshClient();
-
-      controller.backPage();
-
+      if (mounted) controller.backPage();
     } catch (e) {
       Get.snackbar(
-        'Error',
+        'No fue posible guardar el activo',
         e.toString(),
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
-      setState(() => loading = false);
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -293,35 +386,56 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
   }
 
   Future<void> _uploadImage() async {
-    if (selectedImage == null) {
-      Get.snackbar("Error", "Selecciona una imagen primero");
+    if (selectedImage == null || uploadingImage || loading) {
+      if (selectedImage == null) {
+        Get.snackbar('Falta una fotografia', 'Selecciona una imagen primero.');
+      }
       return;
     }
 
+    // En un activo nuevo, la imagen necesita un registro al cual vincularse.
+    // Validamos los dos campos obligatorios sin abrir un formulario previo.
+    if (!_formKey.currentState!.validate()) {
+      Get.snackbar(
+        'Datos obligatorios',
+        'Completa nombre, tipo y cantidad antes de subir la fotografia.',
+      );
+      return;
+    }
+
+    final datosPendientes = _datosTecnicosFve == null
+        ? null
+        : Map<String, dynamic>.from(_datosTecnicosFve!);
+
     setState(() => uploadingImage = true);
-
+    String etapa = 'crear el activo';
     try {
-      final activo = Get.find<ClientController>().Activo;
-
+      final idActivo = await _asegurarActivoCreado();
+      etapa = 'guardar los datos del activo';
+      // Guarda los datos escritos en esta unica pantalla antes de adjuntar.
+      await _guardarDatosDelActivo(idActivo, datosPendientes);
+      etapa = 'subir la fotografia';
       await uploadImagenActivoApi(
-        idActivo: activo["id_activo"],
-        createdBy: controller.User["id_usuario"],
+        idActivo: idActivo,
+        createdBy: controller.User['id_usuario'],
         image: selectedImage!,
       );
 
-      controller.hasUnsavedChanges.value = true;
-
-      Get.find<ClientController>().setActivo(await getActivoApi(idActivo: activo["id_activo"]));
-      setState(() {
-        selectedImage = null;
-      });
-
-      Get.snackbar("OK", "Imagen subida correctamente");
-
+      etapa = 'actualizar la galeria';
+      clientController.setActivo(await getActivoApi(idActivo: idActivo));
+      await clientController.refreshClient();
+      if (!mounted) return;
+      setState(() => selectedImage = null);
+      controller.hasUnsavedChanges.value = false;
+      Get.snackbar('OK', 'Fotografia subida correctamente.');
     } catch (e) {
-      Get.snackbar("Error", e.toString());
+      Get.snackbar(
+        'No fue posible subir la fotografia',
+        'Fallo en $etapa. $e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } finally {
-      setState(() => uploadingImage = false);
+      if (mounted) setState(() => uploadingImage = false);
     }
   }
 
@@ -498,6 +612,30 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
             ),
           ),
 
+          PerfilUsoActivo(
+            tipo: tipoSeleccionado ?? 'Otro',
+            inicial: _perfilUso,
+            horarioEmpresa: clientController.Client['mipyme']?['horario_operacion'],
+            onChanged: (v) {
+              _perfilUso = v;
+              _markAsChanged();
+            },
+          ),
+          const SizedBox(height: 16),
+          FichaTecnicaVerdeActivo(
+            key: ValueKey("fve_ia_${_revisionFveIA}"),
+            aplicarSugerenciasIA: _revisionFveIA > 0,
+            idActivo: int.tryParse('${clientController.Activo['id_activo'] ?? ''}'),
+            tipo: tipoSeleccionado ?? '',
+            nombre: nombreCtrl.text,
+            onChanged: (datos) {
+              // null indica reinicializacion por cambio de id/tipo;
+              // no representa una edicion del asesor.
+              _datosTecnicosFve = datos;
+              if (datos != null) _markAsChanged();
+            },
+          ),
+          const SizedBox(height: 16),
           if (clientController.Activo["id_activo"] !=
               null) ...[
             const SizedBox(height: 24),
@@ -603,6 +741,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
           }).toList(),
           onChanged: (value) {
             setState(() {
+              _perfilUso = null;
               tipoSeleccionado = value;
             });
 
@@ -734,6 +873,187 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
 
         _buildExistingImages(),
       ],
+    );
+  }
+
+  Future<void> _cargarEstadoReferencias() async {
+    final id = int.tryParse('${clientController.Activo['id_activo'] ?? ''}');
+    if (id == null || !mounted) return;
+    try {
+      final estado = await obtenerEstadoEstimacionesIA(id);
+      if (mounted) setState(() => _estadoReferencias = estado);
+    } catch (e) {
+      debugPrint('Estado referencias IA: $e');
+    }
+  }
+
+  Future<void> _buscarReferencias() async {
+    final id = int.tryParse('${clientController.Activo['id_activo'] ?? ''}');
+    if (id == null || _buscandoReferencias) return;
+    setState(() => _buscandoReferencias = true);
+    try {
+      final r = await investigarReferenciasActivoIA(id);
+      await _cargarEstadoReferencias();
+      if (!mounted) return;
+      setState(() {
+        _ultimoReporteBusquedaFve = r['reporte_busqueda'] is Map
+          ? Map<String, dynamic>.from(r['reporte_busqueda']) : null;
+        _ultimoReporteGuardadoFve = r['guardado'] == true;
+      });
+      await _mostrarReporteBusquedaFve(r);
+    } catch (e) {
+      if (mounted) Get.snackbar('No se completó la búsqueda', e.toString(), snackPosition: SnackPosition.BOTTOM);
+    } finally { if (mounted) setState(() => _buscandoReferencias = false); }
+  }
+
+
+  // FVE_REPORTE_VISIBLE_CRAWLER_V1: resumen visible y comprobable de la ultima investigacion.
+  Future<void> _mostrarReporteBusquedaFve(Map<String, dynamic> respuesta) async {
+    final reporte = respuesta['reporte_busqueda'];
+    if (reporte is! Map) {
+      Get.snackbar('Búsqueda de referencias', respuesta['guardado'] == true
+        ? 'Se guardaron estimaciones por separado.'
+        : 'No hubo estimaciones aprobadas. Revisa los logs del servidor.',
+        snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    final docs = reporte['documentos'] is List ? reporte['documentos'] as List : <dynamic>[];
+    final rechazos = reporte['rechazos'] is List ? reporte['rechazos'] as List : <dynamic>[];
+    final aceptados = reporte['campos_con_estimacion_aceptada'] is List
+      ? reporte['campos_con_estimacion_aceptada'] as List : <dynamic>[];
+    await showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Resultado de la búsqueda técnica'),
+      content: SizedBox(width: 650, child: SingleChildScrollView(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Text(respuesta['guardado'] == true
+            ? 'Se guardaron estimaciones aproximadas y se conserva su origen.'
+            : 'Se revisaron fuentes, pero ninguna estimación superó todas las validaciones.',
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 9),
+          Text('Google Search verificado: ${reporte['google_busqueda_verificada'] == true ? 'Sí' : 'No'}'),
+          Text('Crawler ejecutado: ${reporte['crawler_ejecutado'] == true ? 'Sí' : 'No'}'),
+          Text('Páginas visitadas: ${reporte['paginas_visitadas'] ?? 0}; leídas: ${reporte['paginas_leidas'] ?? 0}; errores: ${reporte['errores_lectura'] ?? 0}'),
+          Text('Fichas técnicas encontradas: ${docs.length}; métricas aprobadas: ${aceptados.length}'),
+          if (reporte['error_analisis'] is Map) ...[
+            const SizedBox(height: 9),
+            Text('El crawler encontró documentos, pero Gemini no pudo analizarlos. '
+              'No se guardaron esas referencias. Intentos: '
+              '${(reporte['error_analisis'] as Map)['intentos'] ?? 1}.',
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+          if (reporte['ajustes_clasificacion'] is List &&
+              (reporte['ajustes_clasificacion'] as List).isNotEmpty) ...[
+            const SizedBox(height: 9),
+            const Text('Modelo identificado solo por familia comercial: '
+              'las fichas corresponden a modelos comparables, no al equipo exacto.'),
+          ], // FVE_CRAWLER_ESTABILIDAD_V2
+          const SizedBox(height: 12),
+          Text('Fuentes encontradas', style: TextStyle(color: Global.text, fontWeight: FontWeight.bold)),
+          if (docs.isEmpty)
+            const Text('No se pudo recuperar ninguna ficha técnica en esta búsqueda.'),
+          for (final doc in docs)
+            if (doc is Map) Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(border: Border.all(color: Colors.orange.withOpacity(.35)),
+                borderRadius: BorderRadius.circular(8)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${doc['titulo'] ?? 'Ficha técnica'}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                if (doc['consumos_detectados_kwh_mes'] is List &&
+                    (doc['consumos_detectados_kwh_mes'] as List).isNotEmpty)
+                  Text('Consumos mencionados: ${(doc['consumos_detectados_kwh_mes'] as List).join(', ')} kWh/mes'),
+                if (doc['capacidad_titulo_l'] != null)
+                  Text('Capacidad indicada en el título: ${doc['capacidad_titulo_l']} L'),
+                const SizedBox(height: 4),
+                SelectableText('${doc['url'] ?? ''}',
+                  style: TextStyle(fontSize: 11, color: Global.primary)),
+              ]),
+            ),
+          if (rechazos.isNotEmpty) ...[
+            const SizedBox(height: 13),
+            Text('Motivos de rechazo', style: TextStyle(color: Global.text, fontWeight: FontWeight.bold)),
+            for (final item in rechazos)
+              if (item is Map) Padding(padding: const EdgeInsets.only(top: 4),
+                child: Text(item['motivo'] == 'FUENTES_EXTRAIDAS_INSUFICIENTES'
+                  ? '${item['codigo']}: faltan sitios independientes (${item['dominios_validos']} de ${item['dominios_necesarios']})'
+                  : '${item['codigo']}: ${item['motivo'] ?? 'Sin soporte suficiente'}',
+                  style: const TextStyle(fontSize: 12))),
+          ],
+          const SizedBox(height: 12),
+          Text('${reporte['advertencia'] ?? 'Referencias orientativas, no mediciones del activo.'}',
+            style: TextStyle(fontSize: 12, color: Global.textSecondary)),
+        ]),
+      )),
+      actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cerrar'))],
+    ));
+  }
+
+  Widget _panelReferencias() {
+    final e = _estadoReferencias;
+    if (e == null) return const SizedBox.shrink();
+    final faltantes = e['faltantes'] is List ? (e['faltantes'] as List) : <dynamic>[];
+    final estimaciones = e['estimaciones'] is Map ? e['estimaciones'] as Map : {};
+    final camposEstimados = estimaciones['campos'] is Map ? estimaciones['campos'] as Map : {};
+    if (faltantes.isEmpty && camposEstimados.isEmpty) return const SizedBox.shrink();
+    final puedeBuscar = faltantes.any((f) => f is Map && f['estimable'] == true);
+    final nombres = faltantes.whereType<Map>().map((f) => '${f['etiqueta']}').join(', ');
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16), padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.orange.withOpacity(.08), borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withOpacity(.35))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [const Icon(Icons.warning_amber_rounded, color: Colors.orange), const SizedBox(width: 8),
+          Expanded(child: Text('Informacion tecnica incompleta', style: TextStyle(color: Global.text,fontWeight: FontWeight.w700)))]),
+        const SizedBox(height: 7),
+        if (faltantes.isNotEmpty) Text('No se detectó: $nombres.', style: TextStyle(color: Global.text)),
+        const SizedBox(height: 6),
+        Text('Sin esos datos, el diagnostico puede carecer de metricas. La busqueda IA genera aproximaciones, NO mediciones.',
+          style: TextStyle(color: Global.textSecondary, fontSize: 12)),
+        if (camposEstimados.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text('Referencias aproximadas guardadas:', style: TextStyle(color: Global.text,fontWeight: FontWeight.w600)),
+          for (final x in camposEstimados.entries)
+            if (x.value is Map) Padding(padding: const EdgeInsets.only(top: 5),
+              child: Text('${x.key}: ${x.value['valor']} ${x.value['unidad']} • ${x.value['coincidencia']} (IA, sin verificar)',
+                style: TextStyle(color: Global.text, fontSize: 12))),
+          for (final x in camposEstimados.entries)
+            if (x.value is Map) ...[
+              const SizedBox(height: 7),
+              Text('Método: ${x.value['metodo'] ?? 'No especificado'}',
+                style: TextStyle(color: Global.textSecondary,fontSize: 11)),
+              for (final f in (x.value['fuentes'] is List ? x.value['fuentes'] as List : <dynamic>[]))
+                if (f is Map && f['url'] != null)
+                  Padding(padding: const EdgeInsets.only(top: 3),
+                    child: SelectableText('Fuente IA: ${f['url']}',
+                      style: TextStyle(color: Global.primary,fontSize: 11))),
+            ],
+          Text('Estas referencias no se han copiado a la ficha tecnica. Las fuentes citadas requieren validacion humana.',
+            style: TextStyle(color: Global.textSecondary,fontSize: 11)),
+        ],
+        if (_ultimoReporteBusquedaFve != null) ...[
+          const SizedBox(height: 10),
+          Text('Última búsqueda: ${(_ultimoReporteBusquedaFve!['documentos'] as List?)?.length ?? 0} fichas encontradas; '
+            '${(_ultimoReporteBusquedaFve!['campos_con_estimacion_aceptada'] as List?)?.length ?? 0} métricas aprobadas.',
+            style: TextStyle(fontSize: 12, color: Global.text, fontWeight: FontWeight.w600)),
+          TextButton.icon(
+            icon: const Icon(Icons.receipt_long_outlined, size: 17),
+            label: const Text('Ver fuentes y motivos de rechazo'),
+            onPressed: () => _mostrarReporteBusquedaFve({
+              'reporte_busqueda': _ultimoReporteBusquedaFve,
+              'guardado': _ultimoReporteGuardadoFve,
+            }),
+          ),
+        ],
+        if (puedeBuscar) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(onPressed: _buscandoReferencias ? null : _buscarReferencias,
+            icon: _buscandoReferencias
+              ? const SizedBox(width: 16,height: 16,child:CircularProgressIndicator(strokeWidth:2))
+              : const Icon(Icons.travel_explore_outlined),
+            label: Text(_buscandoReferencias ? 'Buscando fuentes...' : 'Buscar referencias aproximadas con IA')),
+        ],
+      ]),
     );
   }
 
@@ -873,6 +1193,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
             ),
           ],
 
+          _panelReferencias(),
           const SizedBox(height: 16),
 
           Align(
@@ -1065,8 +1386,10 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
       );
 
       clientController.setActivo(asset);
+      _revisionFveIA++;
 
       _synchronizeAssetForm();
+      await _cargarEstadoReferencias();
 
       Get.snackbar(
         'Análisis completado',
@@ -1090,6 +1413,10 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
 
   void _synchronizeAssetForm() {
     final asset = clientController.Activo;
+    final datosActivo = asset['datos'];
+    final perfilGuardado = datosActivo is Map ? datosActivo['fve_perfil_uso'] : null;
+    _perfilUso = perfilGuardado is Map
+        ? Map<String, dynamic>.from(perfilGuardado) : null;
 
     nombreCtrl.text =
         asset["nombre"]?.toString() ?? '';
@@ -1147,7 +1474,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed:
-                  uploadingImage ? null : pickImage,
+                  (uploadingImage || loading) ? null : pickImage,
                   icon: const Icon(
                     Icons.image_outlined,
                   ),
@@ -1158,7 +1485,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed:
-                  uploadingImage ? null : takePhoto,
+                  (uploadingImage || loading) ? null : takePhoto,
                   icon: const Icon(
                     Icons.camera_alt_outlined,
                   ),
@@ -1177,7 +1504,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
                   child: SizedBox(
                     height: 46,
                     child: ElevatedButton.icon(
-                      onPressed: uploadingImage
+                      onPressed: (uploadingImage || loading)
                           ? null
                           : _uploadImage,
                       icon: uploadingImage
@@ -1339,6 +1666,7 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
                 borderRadius: BorderRadius.circular(11),
                 child: Image.network(
                   Utils.buildUrl(image),
+                  headers: Utils.imageHeaders,
                   width: 112,
                   height: 112,
                   fit: BoxFit.cover,

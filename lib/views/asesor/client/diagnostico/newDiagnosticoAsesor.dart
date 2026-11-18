@@ -616,7 +616,10 @@ class _NewdiagnosticoasesorState
       ),
       _InfoData(
         'Estrato',
-        _mipyme["estrato"],
+        // FVE_FACTURA_COMERCIAL_20261114
+        _mipyme['tipo_factura'] == 'Comercial'
+            ? 'Factura comercial (sin estrato)'
+            : _mipyme["estrato"],
         Icons.layers_outlined,
       ),
     ];

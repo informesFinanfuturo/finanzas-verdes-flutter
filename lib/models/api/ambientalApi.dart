@@ -97,14 +97,14 @@ class AmbientalApi {
   static Future<Map<String, dynamic>> guardar({
     required int idMipyme,
     int? idEvaluacion,
-    required Map<String, dynamic> respuestas,
-    required Map<String, int> puntajes,
+    required Map<String, dynamic> respuestas,    required Map<String, int> puntajes,
+    required Map<String, String> justificaciones,
     required String observacion,
     required bool finalizar,
   }) {
     final cuerpo = {
-      'respuestas': respuestas,
-      'puntajes': puntajes,
+      'respuestas': respuestas,      'puntajes': puntajes,
+      'justificaciones_bloques': justificaciones,
       'observacion_general': observacion,
       'finalizar': finalizar,
     };

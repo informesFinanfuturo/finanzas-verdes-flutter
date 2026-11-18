@@ -91,3 +91,46 @@ Future<List<Map<String, dynamic>>> listarProcesosFveApi({
         (e) => Map<String, dynamic>.from(e as Map),
   ).toList();
 }
+
+// Agregar al final de lib/models/api/fveApi.dart
+Future<Map<String, dynamic>> obtenerSeleccionFveApi({required int idProceso}) async {
+  final token = GetStorage().read('token');
+  final response = await http.get(
+    Uri.parse('${Global.baseUrl}fve/procesos/$idProceso/seleccion'),
+    headers: {'Authorization': 'Bearer $token'},
+  );
+  return _decodeFveResponse(response);
+}
+
+Future<Map<String, dynamic>> guardarSeleccionFveApi({
+  required int idProceso, required List<Map<String, dynamic>> lineas,
+}) async {
+  final token = GetStorage().read('token');
+  final response = await http.put(
+    Uri.parse('${Global.baseUrl}fve/procesos/$idProceso/seleccion'),
+    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+    body: jsonEncode({'lineas': lineas}),
+  );
+  return _decodeFveResponse(response);
+}
+
+Future<Map<String, dynamic>> confirmarSeleccionFveApi({
+  required int idProceso, required List<Map<String, dynamic>> lineas,
+}) async {
+  final token = GetStorage().read('token');
+  final response = await http.post(
+    Uri.parse('${Global.baseUrl}fve/procesos/$idProceso/confirmar-seleccion'),
+    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+    body: jsonEncode({'lineas': lineas}),
+  );
+  return _decodeFveResponse(response);
+}
+// FVE_ORIGEN_API: leer el diagnostico vivo, no una copia incompleta.
+Future<Map<String, dynamic>> obtenerDiagnosticoOrigenFveApi({required int idProceso}) async {
+  final token = GetStorage().read('token');
+  final response = await http.get(
+    Uri.parse('${Global.baseUrl}fve/procesos/$idProceso/diagnostico-origen'),
+    headers: {'Authorization': 'Bearer $token'},
+  );
+  return _decodeFveResponse(response);
+}

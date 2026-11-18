@@ -1,4 +1,5 @@
 import 'package:finanzas_verdes/app/config/Global.dart';
+import 'package:finanzas_verdes/views/asesor/client/mipyme/horarioOperacionEmpresa.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -29,6 +30,10 @@ class _ClientInformationSectionState
   Map get mipyme => widget.mipyme ?? {};
 
   String getValue(String key) {
+    // FVE_FACTURA_COMERCIAL_20261114 - mostrar la factura comercial sin inventar estrato.
+    if (key == 'estrato' && mipyme['tipo_factura'] == 'Comercial') {
+      return 'Factura comercial (sin estrato)';
+    }
     final value = mipyme[key];
 
     if (value == null || value.toString().trim().isEmpty) {
@@ -165,6 +170,11 @@ class _ClientInformationSectionState
                             icon: Icons.people_outline_rounded,
                             label: 'Número de empleados',
                             value: getValue('cantidad_empleados'),
+                          ),
+                          _InfoRow(
+                            icon: Icons.schedule_outlined,
+                            label: 'Horario de funcionamiento',
+                            value: resumenHorarioEmpresa(mipyme['horario_operacion']),
                             showDivider: false,
                           ),
                         ],

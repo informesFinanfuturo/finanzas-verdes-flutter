@@ -241,7 +241,8 @@ class Global {
     "Lavadoras", // SI
     "Lava vajillas", // SOLO UNO
     "Sanitarios", // SI
-    "Grifos", // SI
+    "Grifos",
+    "Reductores de caudal", // SI
     "Otro",
   ];
 }

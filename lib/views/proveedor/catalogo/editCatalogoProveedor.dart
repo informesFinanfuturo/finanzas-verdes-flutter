@@ -242,6 +242,7 @@ class _EditcatalogoproveedorState extends State<Editcatalogoproveedor> {
                                 borderRadius: BorderRadius.circular(12),
                                 child: Image.network(
                                     url,
+                  headers: Utils.imageHeaders,
                                     width: 120,
                                     height: 120,
                                     fit: BoxFit.cover,

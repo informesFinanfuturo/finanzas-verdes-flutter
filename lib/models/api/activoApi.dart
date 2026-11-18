@@ -14,11 +14,11 @@ Future<Map> createActivoApi({
   required String nombre,
   required String tipo,
   required int idMipyme,
-  required int createdBy,
   required String marca,
   String? modelo,
   String? descripcion,
   Map<String, dynamic>? datos,
+  Map<String, dynamic>? perfilUso,
 }) async {
 
   final uri = Uri.parse('${Global.baseUrl}activo');
@@ -38,11 +38,13 @@ Future<Map> createActivoApi({
         'tipo': tipo,
         'marca': marca,
         'id_mipyme': idMipyme,
-        'created_by': createdBy,
 
         // ✅ OPCIONALES
         if (descripcion != null) 'descripcion': descripcion,
-        if (datos != null) 'datos': datos,
+        if (datos != null || perfilUso != null) 'datos': {
+          ...?datos,
+          if (perfilUso != null) 'fve_perfil_uso': perfilUso,
+        },
         if (modelo != null) 'modelo': modelo,
       }),
     );
@@ -56,6 +58,11 @@ Future<Map> createActivoApi({
     if (response.statusCode == 401) {
       await controller.requestLogOut();
       return {};
+    }
+
+    if (response.statusCode == 403) {
+      final data = jsonDecode(response.body);
+      throw Exception('Acceso denegado al crear el activo: ${data['error'] ?? 'No autorizado'}. Revisa la relacion entre asesor y empresa.');
     }
 
     if (response.statusCode == 400 || response.statusCode == 404) {
@@ -99,6 +106,11 @@ Future<Map<String, dynamic>> getActivoApi({
       throw Exception('Sesión expirada');
     }
 
+    if (response.statusCode == 403) {
+      final data = jsonDecode(response.body);
+      throw Exception('Acceso denegado al consultar el activo: ${data['error'] ?? 'No autorizado'}. Comprueba el permiso Obtener activo.');
+    }
+
     if (response.statusCode == 400 || response.statusCode == 404) {
       final data = jsonDecode(response.body);
       throw Exception(data['error'] ?? 'Error al obtener activo');
@@ -123,6 +135,7 @@ Future<void> updateActivoApi({
   String? marca,
   int? cantidad,
   Map<String, dynamic>? datos,
+  Map<String, dynamic>? perfilUso,
   String? estadoActivo,
 }) async {
 
@@ -142,6 +155,7 @@ Future<void> updateActivoApi({
         'tipo': tipo,
         'descripcion': descripcion,
         'datos': datos,
+        if (perfilUso != null) 'perfil_uso': perfilUso,
         if(estadoActivo != null) 'estado_activo': estadoActivo,
         'modelo': modelo,
         'marca': marca,
@@ -160,6 +174,11 @@ Future<void> updateActivoApi({
     if (response.statusCode == 401) {
       controller.logOut();
       return;
+    }
+
+    if (response.statusCode == 403) {
+      final data = jsonDecode(response.body);
+      throw Exception('Acceso denegado al editar el activo: ${data['error'] ?? 'No autorizado'}. Comprueba el permiso Editar activo.');
     }
 
     if (response.statusCode == 400 || response.statusCode == 404) {
@@ -214,6 +233,16 @@ Future<void> uploadImagenActivoApi({
 
     final respStr = await response.stream.bytesToString();
     print(respStr);
+    if (response.statusCode == 403) {
+      String mensaje = 'Acceso denegado al subir imagen';
+      try {
+        final cuerpo = jsonDecode(respStr);
+        if (cuerpo is Map && cuerpo['error'] != null) {
+          mensaje = cuerpo['error'].toString();
+        }
+      } catch (_) {}
+      throw Exception('$mensaje (403)');
+    }
 
     throw Exception("Error upload (${response.statusCode})");
 
@@ -265,12 +294,10 @@ Future<void> deleteImagenActivoApi({
 Future<void> analizarActivoApi({
   required int idActivo,
 }) async {
-
   final uri = Uri.parse('${Global.baseUrl}activo/analizar/$idActivo');
-  final token = GetStorage().read("token");
-
+  final token = GetStorage().read('token');
+  showLoadingDialog();
   try {
-    showLoadingDialog();
     final response = await http.post(
       uri,
       headers: {
@@ -278,101 +305,42 @@ Future<void> analizarActivoApi({
         'Authorization': 'Bearer $token',
       },
     );
-
-    hideLoadingDialog();
-
-    /// ✅ PROTEGER JSON
     Map<String, dynamic> data = {};
     if (response.body.isNotEmpty) {
       try {
-        data = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map) {
+          data = Map<String, dynamic>.from(decoded);
+        }
       } catch (_) {
-        data = {};
+        // Respuesta sin JSON: se mostrara el codigo HTTP.
       }
     }
-
-    /// ✅ ÉXITO
     if (response.statusCode == 200) {
-
-      Get.snackbar(
-        "IA",
-        "Activo analizado correctamente ✅",
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-
+      final faltantes = data['imagenes_no_disponibles'];
+      if (faltantes is num && faltantes > 0) {
+        Get.snackbar(
+          'Evidencias incompletas',
+          'El analisis omitio $faltantes imagenes ausentes del servidor.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
       return;
     }
-
-    /// ✅ AUTH
     if (response.statusCode == 401) {
       controller.logOut();
-      return;
+      throw Exception('Tu sesion vencio. Vuelve a iniciar sesion.');
     }
-
-    /// ✅ ERROR IA 🔥 (te faltaba esto)
-    if (response.statusCode == 422) {
-
-      final mensaje = data["ai_error"]?["message_user"] ??
-          "La IA no pudo analizar el activo";
-
-      Get.snackbar(
-        "IA",
-        mensaje,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 4),
-      );
-
-      return;
-    }
-
-    /// ✅ ERRORES BACKEND
-    if (response.statusCode == 400 || response.statusCode == 404) {
-
-      final mensaje = data['error'] ?? 'Error al analizar activo';
-
-      Get.snackbar(
-        "Error",
-        mensaje,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-
-      return;
-    }
-
-    /// ✅ OTROS
-    Get.snackbar(
-      "Error",
-      "Error inesperado (${response.statusCode})",
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
-
-  } catch (e) {
-
-    hideLoadingDialog();
-
-    print("ERROR ANALIZAR ACTIVO: $e");
-
-    Get.snackbar(
-      "Error",
-      "No se pudo conectar con el servidor",
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    final errorIA = data['ai_error'];
+    final mensajeIA = errorIA is Map ? errorIA['message_user']?.toString() : null;
+    final mensaje = mensajeIA ?? data['error']?.toString() ?? 'Error HTTP ${response.statusCode}';
+    throw Exception(mensaje);
   } finally {
-    if (Get.isDialogOpen ?? false) {
-      Get.back();
-    }
+    hideLoadingDialog();
   }
 }
-
 Future<void> deleteActivoApi({
   required int idActivo,
 }) async {
@@ -448,4 +416,27 @@ void hideLoadingDialog() {
   if (Get.isDialogOpen ?? false) {
     Get.close(1);
   }
+}
+
+
+// Informacion de referencia separada del inventario tecnico certificado.
+Future<Map<String, dynamic>> obtenerEstadoEstimacionesIA(int idActivo) async {
+  final token = GetStorage().read('token');
+  final r = await http.get(Uri.parse('${Global.baseUrl}activo/$idActivo/estimaciones'),
+    headers: {'Authorization':'Bearer $token'}).timeout(const Duration(seconds: 25));
+  final json = jsonDecode(r.body);
+  if (r.statusCode != 200 || json is! Map) {
+    throw Exception(json is Map ? json['error'] ?? 'No se pudo consultar el estado' : 'HTTP ${r.statusCode}');
+  }
+  return Map<String, dynamic>.from(json);
+}
+Future<Map<String, dynamic>> investigarReferenciasActivoIA(int idActivo) async {
+  final token = GetStorage().read('token');
+  final r = await http.post(Uri.parse('${Global.baseUrl}activo/$idActivo/estimaciones/investigar'),
+    headers: {'Authorization':'Bearer $token'}).timeout(const Duration(seconds: 150));
+  final json = jsonDecode(r.body);
+  if (r.statusCode != 200 || json is! Map) {
+    throw Exception(json is Map ? json['error'] ?? 'No se pudo buscar' : 'HTTP ${r.statusCode}');
+  }
+  return Map<String, dynamic>.from(json);
 }

@@ -1803,6 +1803,7 @@ class _EditconsumoasesorState extends State<Editconsumoasesor> {
                       BorderRadius.circular(11),
                       child: Image.network(
                         Utils.buildUrl(image),
+                  headers: Utils.imageHeaders,
                         width: 104,
                         height: 104,
                         fit: BoxFit.cover,

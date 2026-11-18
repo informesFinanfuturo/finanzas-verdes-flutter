@@ -62,15 +62,22 @@ class _SelectorAlternativaDialogState
   List<Map<String, dynamic>>
   _alternativas = [];
 
+  // FVE_ALTERNATIVA_TRAZABLE_V1: preseleccion visual, no aprobacion comercial.
+  Map<String, dynamic>? _sugerenciaIA;
+
   Map<String, dynamic>?
   _alternativaSeleccionada;
 
   String? _proveedorSeleccionado;
 
+  late int _idActivoConsulta;
+  Map<String, dynamic>? _vinculoPendiente;
+  Map<String, dynamic>? _diagnosticoReparado;
+
   @override
   void initState() {
     super.initState();
-
+    _idActivoConsulta = widget.idActivo;
     _cargarAlternativas();
   }
 
@@ -86,6 +93,7 @@ class _SelectorAlternativaDialogState
     setState(() {
       _loading = true;
       _error = null;
+      _vinculoPendiente = null;
     });
 
     try {
@@ -96,8 +104,18 @@ class _SelectorAlternativaDialogState
         widget.idDiagnostico,
 
         idActivo:
-        widget.idActivo,
+        _idActivoConsulta,
       );
+
+      if (response['codigo'] == 'ACTIVO_SIN_VINCULO') {
+        if (mounted) {
+          setState(() {
+            _vinculoPendiente = response;
+            _loading = false;
+          });
+        }
+        return;
+      }
 
       final activoResponse =
       response["activo"];
@@ -126,7 +144,14 @@ class _SelectorAlternativaDialogState
         widget.seleccionActual?["id_item"],
       );
 
-      if (idSeleccionado != null) {
+      final sugerenciaRaw = response['sugerencia_ia'];
+      final sugerencia = sugerenciaRaw is Map
+          ? Map<String, dynamic>.from(sugerenciaRaw) : null;
+      final idSugerido = _toInt(sugerencia?['id_item']);
+      // Una seleccion humana existente prevalece. Si no existe, se
+      // destaca la opcion del diagnostico (sin persistirla).
+      final idInicial = idSeleccionado ?? idSugerido;
+      if (idInicial != null) {
         for (final alternativa
         in alternativas) {
 
@@ -134,7 +159,7 @@ class _SelectorAlternativaDialogState
           _toInt(
             alternativa["id_item"],
           ) ==
-              idSeleccionado
+              idInicial
           ) {
             seleccionEncontrada =
                 alternativa;
@@ -159,6 +184,7 @@ class _SelectorAlternativaDialogState
         _alternativas =
             alternativas;
 
+        _sugerenciaIA = sugerencia;
         _alternativaSeleccionada =
             seleccionEncontrada;
 
@@ -335,6 +361,15 @@ class _SelectorAlternativaDialogState
     );
   }
 
+  Map<String,dynamic>? _resultadoCierre() {
+    if (_diagnosticoReparado == null) return null;
+    return {
+      'solo_vinculo': true,
+      'id_activo_resuelto': _idActivoConsulta,
+      'diagnostico_actualizado': _diagnosticoReparado,
+    };
+  }
+
   Widget _buildHeader(
       bool isMobile,
       ) {
@@ -412,8 +447,7 @@ class _SelectorAlternativaDialogState
           IconButton(
             tooltip: 'Cerrar',
             onPressed: () {
-              Navigator.of(context)
-                  .pop();
+              Navigator.of(context).pop(_resultadoCierre());
             },
             icon: Icon(
               Icons.close_rounded,
@@ -458,18 +492,123 @@ class _SelectorAlternativaDialogState
     if (_error != null) {
       return _buildError();
     }
+    if (_vinculoPendiente != null) {
+      return _buildVinculoPendiente();
+    }
 
     return Column(
       children: [
         _buildFilters(
           isMobile,
         ),
+        if (_sugerenciaIA != null) _buildAvisoSugerencia(),
 
         Expanded(
           child:
           _buildAlternatives(),
         ),
       ],
+    );
+  }
+
+  Future<void> _vincularActivo({int? idReal, bool crear = false}) async {
+    final nombre = _vinculoPendiente?['activo_diagnostico']?['nombre']?.toString() ?? 'este activo';
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(crear ? 'Registrar activo' : 'Vincular activo'),
+        content: Text(crear
+          ? 'Se registrara "$nombre" en el inventario de esta empresa. Confirma que el equipo existe realmente. Sus datos tecnicos quedaran pendientes.'
+          : 'Confirma que este equipo del inventario corresponde al activo "$nombre" del diagnostico. Se conservara la referencia anterior.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirmar')),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final resultado = await vincularActivoDiagnosticoApi(
+        idDiagnostico: widget.idDiagnostico,
+        idActivoOriginal: widget.idActivo,
+        idActivoReal: idReal,
+        crearDesdeDiagnostico: crear,
+      );
+      if (!mounted) return;
+      final nuevoId = _toInt(resultado['id_activo_real']);
+      if (nuevoId == null) throw Exception('La API no devolvio un activo valido.');
+      _idActivoConsulta = nuevoId;
+      if (resultado['diagnostico'] is Map) {
+        _diagnosticoReparado=Map<String,dynamic>.from(resultado['diagnostico']);
+      }
+      await _cargarAlternativas();
+    } catch (e) {
+      if(!mounted) return;
+      setState(() {
+        _loading=false;
+        _error=e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Widget _buildVinculoPendiente() {
+    final datos = _vinculoPendiente!;
+    final opcionesRaw = datos['opciones'];
+    final opciones = opcionesRaw is List
+      ? opcionesRaw.whereType<Map>().map((a)=>Map<String,dynamic>.from(a)).toList()
+      : <Map<String,dynamic>>[];
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.link_off_rounded, color: Global.primary, size: 36),
+              const SizedBox(height: 12),
+              Text('Vincular activo al inventario',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 17,
+                  fontWeight: FontWeight.w600, color: Global.text)),
+              const SizedBox(height: 8),
+              Text('El diagnostico conserva este equipo, pero su identificador ya no corresponde al inventario vigente. Elige el activo correcto o registralo si realmente falta.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 11,color: Global.textSecondary)),
+              const SizedBox(height: 18),
+              if (opciones.isNotEmpty) ...[
+                Align(alignment: Alignment.centerLeft,
+                  child: Text('Equipos de esta empresa con la misma categoria',
+                    style: GoogleFonts.poppins(fontSize: 12,fontWeight: FontWeight.w600,color: Global.text))),
+                const SizedBox(height: 8),
+                ...opciones.map((opcion) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SizedBox(width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _toInt(opcion['id_activo']) == null ? null
+                        : () => _vincularActivo(idReal: _toInt(opcion['id_activo'])),
+                      icon: const Icon(Icons.link_rounded, size: 17),
+                      label: Text("${opcion['nombre'] ?? 'Activo'}  •  #${opcion['id_activo']}",
+                        overflow: TextOverflow.ellipsis),
+                    ),
+                  ),
+                )),
+              ],
+              if (datos['puede_registrar'] == true) ...[
+                const SizedBox(height: 6),
+                TextButton.icon(
+                  onPressed: () => _vincularActivo(crear: true),
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                  label: const Text('El equipo no existe: registrarlo en el inventario'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -709,6 +848,42 @@ class _SelectorAlternativaDialogState
     );
   }
 
+  // FVE_REFERENCIA_CONSUMO_IA_V1: referencia textual de producto, no metrica evaluada.
+  Widget _buildAvisoSugerencia() {
+    final s = _sugerenciaIA!;
+    final energia = s['consumo_energia_proyectado_mes'];
+    final agua = s['consumo_agua_proyectado_mes'];
+    final dato = energia is num ? '${energia.toString().replaceAll('.', ',')} kWh/mes'
+        : agua is num ? '${agua.toString().replaceAll('.', ',')} m³/mes'
+        : null;
+    final referencia = s['consumo_referencia_ia'];
+    final referenciaValor = referencia is Map ? referencia['valor'] : null;
+    final referenciaTexto = referenciaValor is num
+        ? '${referenciaValor.toString().replaceAll('.', ',')} kWh/mes' : null;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Global.primary.withOpacity(.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Global.primary.withOpacity(.20)),
+      ),
+      child: Row(children: [
+        Icon(Icons.auto_awesome_rounded, color: Global.primary, size: 19),
+        const SizedBox(width: 10),
+        Expanded(child: Text(
+          'Sugerencia del diagnóstico: ${s['nombre'] ?? 'Producto'}.'
+          '${dato == null ? '' : ' Proyección del diagnóstico: $dato.'}'
+          '${referenciaTexto == null ? '' : ' Consumo citado como referencia: $referenciaTexto (sin verificación independiente).'}'
+          ' Revisa el producto y confirma tu elección. No hay ahorro verificable sin línea base.'
+          '${s['origen'] == 'modelo_unico_precio_actualizado' ? ' El precio del catálogo ha cambiado.' : ''}',
+          style: GoogleFonts.poppins(fontSize: 10.5, color: Global.text),
+          maxLines: 5, overflow: TextOverflow.ellipsis,
+        )),
+      ]),
+    );
+  }
+
   Widget _buildAlternatives() {
 
     final alternativas =
@@ -804,6 +979,8 @@ class _SelectorAlternativaDialogState
                   "id_item"],
                 );
 
+    final recomendadaPorDiagnostico = idItem != null &&
+        idItem == _toInt(_sugerenciaIA?['id_item']);
     final proveedor =
     _nombreProveedor(
       alternativa,
@@ -968,6 +1145,16 @@ class _SelectorAlternativaDialogState
                 ],
               ),
 
+              if (recomendadaPorDiagnostico) ...[
+                const SizedBox(height: 8),
+                Row(children: [
+                  Icon(Icons.auto_awesome_rounded, color: Global.primary, size: 13),
+                  const SizedBox(width: 5),
+                  Expanded(child: Text('Sugerida por el diagnóstico',
+                    style: GoogleFonts.poppins(fontSize: 10, color: Global.primary,
+                      fontWeight: FontWeight.w600))),
+                ]),
+              ],
               const SizedBox(
                 height: 13,
               ),
@@ -1297,9 +1484,7 @@ class _SelectorAlternativaDialogState
     final cancelButton =
     OutlinedButton(
       onPressed: () {
-        Navigator.of(
-          context,
-        ).pop();
+        Navigator.of(context).pop(_resultadoCierre());
       },
       style:
       OutlinedButton.styleFrom(
@@ -1341,6 +1526,32 @@ class _SelectorAlternativaDialogState
         Map<String, dynamic>.from(
           _alternativaSeleccionada!,
         );
+
+        if (_toInt(resultado['id_item']) == _toInt(_sugerenciaIA?['id_item']) &&
+            _sugerenciaIA != null) {
+          // Proyeccion perteneciente UNICAMENTE al producto recomendado.
+          // FVE_METRICAS_ALTERNATIVA_V1: si la API ya adjunto una proyeccion al producto
+          // coincidente, nunca sustituir un numero por un null del resumen.
+          final proyeccionProductoRaw = resultado['proyeccion_ia'];
+          final proyeccionProducto = proyeccionProductoRaw is Map
+              ? Map<String, dynamic>.from(proyeccionProductoRaw) : <String, dynamic>{};
+          resultado['proyeccion_ia'] = {
+            'consumo_energia_proyectado_mes':
+                proyeccionProducto['consumo_energia_proyectado_mes'] ??
+                _sugerenciaIA!['consumo_energia_proyectado_mes'],
+            'consumo_agua_proyectado_mes':
+                proyeccionProducto['consumo_agua_proyectado_mes'] ??
+                _sugerenciaIA!['consumo_agua_proyectado_mes'],
+          };
+          resultado['origen_recomendacion'] =
+              resultado['origen_recomendacion'] ?? _sugerenciaIA!['origen'];
+          resultado['consumo_referencia_ia'] =
+              resultado['consumo_referencia_ia'] ?? _sugerenciaIA!['consumo_referencia_ia'];
+        }
+        resultado['id_activo_resuelto'] = _idActivoConsulta;
+        if (_diagnosticoReparado != null) {
+          resultado['diagnostico_actualizado'] = _diagnosticoReparado;
+        }
 
         resultado[
         "cantidad_activo"

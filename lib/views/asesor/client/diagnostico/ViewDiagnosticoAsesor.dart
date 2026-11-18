@@ -105,83 +105,7 @@ class _ViewdiagnosticoasesorState
       }
     }
 
-    /*
-   * 2. Para los activos que aún no
-   * tienen una selección guardada,
-   * utilizamos el producto recomendado
-   * por la IA.
-   */
-    for (final item in activos) {
-
-      if (item is! Map) {
-        continue;
-      }
-
-      final activo =
-      Map<String, dynamic>.from(
-        item,
-      );
-
-      final idActivo =
-      _toInt(
-        activo["id_activo"],
-      );
-
-      if (idActivo == null) {
-        continue;
-      }
-
-      /*
-     * No sobrescribimos una decisión
-     * humana o guardada anteriormente.
-     */
-      if (
-      alternativasSeleccionadas
-          .containsKey(idActivo)
-      ) {
-        continue;
-      }
-
-      final recomendado =
-      activo[
-      "producto_recomendado"
-      ];
-
-      if (recomendado is! Map) {
-        continue;
-      }
-
-      final alternativaIA =
-      Map<String, dynamic>.from(
-        recomendado,
-      );
-
-      final idItem =
-      _toInt(
-        alternativaIA["id_item"],
-      );
-
-      if (idItem == null) {
-        continue;
-      }
-
-      alternativaIA["id_activo"] =
-          idActivo;
-
-      alternativaIA["cantidad_activo"] =
-          alternativaIA[
-          "cantidad_activo"
-          ] ??
-              activo["cantidad"] ??
-              1;
-
-      alternativaIA["fuente"] =
-      "ia";
-
-      alternativasSeleccionadas[
-      idActivo
-      ] = alternativaIA;
-    }
+    // Las recomendaciones IA se muestran como sugerencias, no quedan seleccionadas.
 
     /*
    * 3. Si ya existía una propuesta
@@ -211,32 +135,14 @@ class _ViewdiagnosticoasesorState
       return;
     }
 
-    /*
-   * 4. En un diagnóstico nuevo
-   * incluimos inicialmente los activos
-   * que tienen recomendación válida.
-   */
-    for (final item in activos) {
-
-      if (item is! Map) {
-        continue;
-      }
-
-      final idActivo =
-      _toInt(
-        item["id_activo"],
-      );
-
-      if (
-      idActivo != null &&
-          alternativasSeleccionadas
-              .containsKey(idActivo)
-      ) {
-        activosSeleccionados.add(
-          idActivo,
-        );
-      }
+    // FVE_AUTO_SIMULAR_DIAGNOSTICO_V1
+    // Solo preseleccion para el simulador, nunca confirmacion comercial FVE.
+    for (final activo in activos) {
+      if (activo is! Map) continue;
+      final id = _toInt(activo['id_activo']);
+      if (id != null) activosSeleccionados.add(id);
     }
+
   }
 
   int? _toInt(dynamic value) {
@@ -1198,6 +1104,61 @@ class _ViewdiagnosticoasesorState
     );
   }
 
+  // FVE_GUARDAR_SELECCION: confirmacion explicita, independiente de la decision comercial.
+  bool _guardandoSeleccionFve = false;
+  Future<void> _guardarSeleccionParaFve() async {
+    if (_guardandoSeleccionFve) return;
+    final idDiag = _toInt(clientController.Diagnostico['id_diagnostico']);
+    if (idDiag == null) return;
+    final ids = activosSeleccionados.toList();
+    if (ids.isEmpty) {
+      Get.snackbar('Seleccion vacia', 'Selecciona por lo menos un activo.', snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    // Las recomendaciones IA no equivalen a una eleccion del asesor.
+    final pendientes = ids.where((id) => _toInt(alternativasSeleccionadas[id]?['id_item']) == null ||
+        alternativasSeleccionadas[id]?['fuente'] != 'usuario').toList();
+    if (pendientes.isNotEmpty) {
+      Get.snackbar('Productos sin confirmar',
+        'Abre Ver alternativas y elige un producto para cada activo incluido. Si no lo vas a reemplazar, desmarcalo.',
+        snackPosition: SnackPosition.BOTTOM, duration: const Duration(seconds: 6));
+      return;
+    }
+    setState(() => _guardandoSeleccionFve = true);
+    try {
+      final metricas = getMetricasSeleccionadas();
+      final respuesta = await guardarSeleccionActivosDiagnosticoApi(
+        idDiagnostico: idDiag,
+        activosSeleccionados: ids,
+        alternativasSeleccionadas: ids.map((id) => <String, dynamic>{
+          'id_activo': id, 'id_item': alternativasSeleccionadas[id]!['id_item'], 'fuente': 'usuario',
+        }).toList(),
+        resumenSeleccionado: <String, dynamic>{
+          'ahorro_economico_mensual': _toNullableDouble(metricas['ahorro']),
+          'inversion_total_requerida': _toNullableDouble(metricas['inversion']),
+          'reduccion_energia': _toNullableDouble(metricas['energia']),
+          'reduccion_agua': _toNullableDouble(metricas['agua']),
+          'reduccion_carbono': _toNullableDouble(metricas['carbono']),
+          'roi': _toNullableDouble(metricas['roi']),
+          'payback': _toNullableDouble(metricas['payback']),
+        },
+      );
+      if (!mounted) return;
+      if (respuesta['diagnostico'] is Map) {
+        clientController.setDiagnostico(Map<String, dynamic>.from(respuesta['diagnostico']));
+      }
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Seleccion guardada. Ya puedes volver a FVE y actualizar la negociacion.'),
+      ));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('No se pudo guardar la seleccion: $e'),
+      ));
+    } finally {
+      if (mounted) setState(() => _guardandoSeleccionFve = false);
+    }
+  }
+
   Widget _buildAssetsSection(Map diagnostico, bool isMobile) {
     final activos = _getActivosOrdenados(diagnostico);
 
@@ -1210,10 +1171,36 @@ class _ViewdiagnosticoasesorState
             icon: Icons.inventory_2_outlined,
             title: "Activos recomendados",
             subtitle:
-            "Ordenados de mayor a menor ahorro económico mensual.",
+            "Oportunidades detectadas automáticamente, ordenadas por ahorro disponible.",
             color: Global.primary,
           ),
         ),
+        // FVE_AUTO_SIMULADOR_AVISO_V1
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+          child: Text(
+            'Los activos detectados se incluyen inicialmente en la simulación. ' 
+            'La selección y el producto deben confirmarse antes de guardar para FVE. ' 
+            'Confianza baja no equivale a elegibilidad verde.',
+            style: GoogleFonts.poppins(fontSize: 11, color: Global.textSecondary),
+          ),
+        ),
+        if (diagnostico['metricas']?['contiene_estimaciones_ia'] == true)
+          Padding(padding: const EdgeInsets.only(top: 10),
+            child: Container(width: double.infinity,padding:const EdgeInsets.all(12),
+              decoration:BoxDecoration(color:Colors.orange.withOpacity(.10),borderRadius:BorderRadius.circular(10)),
+              child:Text('AVISO: Este diagnostico incluye escenarios aproximados de IA basados en referencias externas. No son consumos medidos ni beneficios certificados.',
+                style:TextStyle(color:Global.text,fontWeight:FontWeight.w600,fontSize:12)))),
+        // FVE_GUARDAR_BOTON
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            onPressed: _guardandoSeleccionFve ? null : _guardarSeleccionParaFve,
+            icon: const Icon(Icons.save_outlined, size: 17),
+            label: const Text('Guardar selección para FVE'),
+          ),
+        ),
+        const SizedBox(height: 9),
         const SizedBox(height: 14),
         if (activos.isEmpty)
           _surfaceCard(
@@ -1332,61 +1319,39 @@ class _ViewdiagnosticoasesorState
         ) ??
             1;
 
-    final inversion =
-        precioUnitario *
-            cantidadActivo;
+    final inversion = alternativa['precio_base'] == null
+        ? null : precioUnitario * cantidadActivo;
 
-    final ahorro =
-    _toNullableDouble(
-      originales[
-      "ahorro_economico_mensual"
-      ],
-    );
-
-    final double? roi =
-    inversion > 0 &&
-        ahorro != null
-        ? (
-        (
-            ahorro * 60 -
-                inversion
-        ) /
-            inversion
-    ) *
-        100
-        : null;
-
-    final double? payback =
-    inversion > 0 &&
-        ahorro != null &&
-        ahorro > 0
-        ? inversion / ahorro
-        : null;
-
+    // FVE_METRICAS_ALTERNATIVA_V1: datos atribuidos a una referencia del catalogo; sin linea base no hay ahorro.
+    // FVE_ALTERNATIVA_TRAZABLE_V1: no trasladar proyecciones de la referencia IA a otro producto.
+    final proyeccion = alternativa['proyeccion_ia'];
+    final proyeccionMap = proyeccion is Map ? proyeccion : null;
     return {
       ...originales,
-
-      "inversion_total_requerida":
-      inversion,
-
-      "roi_5_anios":
-      roi,
-
-      "payback":
-      payback,
-
-      "escenario_alternativa":
-      true,
-
-      "metricas_alternativa_disponibles":
-      false,
+      'consumo_energia_proyectado_mes': proyeccionMap?['consumo_energia_proyectado_mes'],
+      'consumo_agua_proyectado_mes': proyeccionMap?['consumo_agua_proyectado_mes'],
+      'ahorro_economico_mensual': null,
+      'reduccion_energia': null,
+      'reduccion_agua': null,
+      'reduccion_carbono': null,
+      'costo_proyectado_mes': null,
+      'inversion_total_requerida': inversion,
+      'roi_5_anios': null,
+      'payback': null,
+      'escenario_alternativa': true,
+      'metricas_alternativa_disponibles': false,
     };
   }
 
+  // FVE_REFERENCIA_CONSUMO_IA_V1: una referencia citada no se suma a las metricas de ahorro.
   Widget _assetCard(dynamic activo) {
     final idActivo = _toInt(activo["id_activo"],);
 
     return Obx(() {
+      final referencia = idActivo == null ? null :
+          alternativasSeleccionadas[idActivo]?['consumo_referencia_ia'];
+      final consumoReferencia = referencia is Map
+          ? _toNullableDouble(referencia['valor']) : null;
       final metricas = _getMetricasVisualesActivo(activo,);
       final selected = idActivo != null && activosSeleccionados.contains(idActivo);
 
@@ -1552,6 +1517,65 @@ class _ViewdiagnosticoasesorState
                     metricas["inversion_total_requerida"],
                   ),
                 ),
+                _miniMetric(
+                  'Consumo proyectado citado por diagnóstico IA (sin verificar)',
+                  _formatMeasurement(
+                    metricas['consumo_energia_proyectado_mes'], 'kWh/mes',
+                  ),
+                ),
+                if (consumoReferencia != null)
+                  _miniMetric(
+                    'Consumo de referencia citado por IA (sin verificar)',
+                    _formatMeasurement(consumoReferencia, 'kWh/mes'),
+                  ),
+                if (metricas['fve_referencias_tecnicas_ia'] is Map &&
+                    metricas['fve_escenario_estimado'] is! Map) ...[
+                  Container(width: double.infinity,padding:const EdgeInsets.all(12),
+                    decoration:BoxDecoration(color:Colors.orange.withOpacity(.10),borderRadius:BorderRadius.circular(10)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start,children:[
+                      Text('REFERENCIAS TECNICAS APROXIMADAS (IA)',
+                        style:TextStyle(color:Global.text,fontWeight:FontWeight.bold,fontSize:11)),
+                      for (final x in (metricas['fve_referencias_tecnicas_ia'] as Map).entries)
+                        if (x.value is Map)
+                          Text('${x.key}: ${x.value['valor']} ${x.value['unidad']} (sin medir)',
+                            style:TextStyle(color:Global.text,fontSize:11)),
+                      Text('No representan mediciones ni ahorros garantizados.',
+                        style:TextStyle(color:Global.textSecondary,fontSize:11)),
+                    ])),
+                  const SizedBox(height: 8),
+                ],
+                if (metricas['fve_escenario_estimado'] is Map) ...[
+                  const SizedBox(height: 9),
+                  Container(width: double.infinity, padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.orange.withOpacity(.10),borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange.withOpacity(.3))),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('ESCENARIO APROXIMADO CON IA', style: TextStyle(color: Global.text,fontSize: 11,fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 5),
+                      Text('Consumo actual estimado (sin medicion): ${metricas['fve_escenario_estimado']['consumo_actual_estimado_kwh_mes']} kWh/mes',
+                        style: TextStyle(color: Global.text, fontSize: 11)),
+                      if (idActivo != null && !alternativasSeleccionadas.containsKey(idActivo) &&
+                          metricas['fve_escenario_estimado']['ahorro_estimado_kwh_mes'] != null)
+                        Text('Diferencia hipotetica: ${metricas['fve_escenario_estimado']['ahorro_estimado_kwh_mes']} kWh/mes',
+                          style: TextStyle(color: Global.text,fontSize: 11)),
+                      if (idActivo != null && !alternativasSeleccionadas.containsKey(idActivo) &&
+                          metricas['fve_escenario_estimado']['ahorro_estimado_cop_mes'] != null)
+                        Text('Ahorro orientativo: ${formatCurrency(metricas['fve_escenario_estimado']['ahorro_estimado_cop_mes'])}/mes',
+                          style: TextStyle(color: Global.text,fontSize: 11)),
+                      if (idActivo != null && !alternativasSeleccionadas.containsKey(idActivo) &&
+                          metricas['fve_escenario_estimado']['roi_estimado_cinco_anios_pct'] != null)
+                        Text('ROI hipotetico a cinco años: ${_formatPercentage(metricas['fve_escenario_estimado']['roi_estimado_cinco_anios_pct'])}',
+                          style: TextStyle(color: Global.text,fontSize: 11)),
+                      const SizedBox(height: 4),
+                      Text('Estimacion externa citada por IA. No es ahorro comprobado ni otorga elegibilidad verde.',
+                        style: TextStyle(color: Global.textSecondary,fontSize: 11)),
+                      for (final f in (metricas['fve_escenario_estimado']['fuentes'] is List
+                         ? metricas['fve_escenario_estimado']['fuentes'] as List : <dynamic>[]))
+                        if (f is Map && f['url'] != null) SelectableText('${f['url']}',
+                          style: TextStyle(color: Global.primary,fontSize: 10)),
+                    ])),
+                  const SizedBox(height: 8),
+                ],
                 _miniMetric(
                   "ROI a 5 años",
                   _formatPercentage(
@@ -2676,20 +2700,34 @@ class _ViewdiagnosticoasesorState
     }
 
     final seleccion =
-    Map<String, dynamic>.from(
-      alternativa,
-    );
+    Map<String, dynamic>.from(alternativa);
+    final soloVinculo = seleccion.remove('solo_vinculo') == true;
+    final idResuelto = _toInt(seleccion.remove('id_activo_resuelto')) ?? idActivo;
+    final diagnosticoCorregido = seleccion.remove('diagnostico_actualizado');
+    if (diagnosticoCorregido is Map) {
+      // La correccion fue escrita por el backend en el diagnostico actual.
+      clientController.setDiagnostico(Map<String,dynamic>.from(diagnosticoCorregido));
+      if (idResuelto != idActivo) {
+        if (activosSeleccionados.remove(idActivo)) activosSeleccionados.add(idResuelto);
+        final previa = alternativasSeleccionadas.remove(idActivo);
+        if (previa != null) {
+          alternativasSeleccionadas[idResuelto] = {...previa, 'id_activo': idResuelto};
+        }
+      }
+      setState(() {});
+    }
+    if (soloVinculo) return;
 
     /*
    * Guardamos también el activo al que
    * corresponde la alternativa.
    */
-    seleccion["id_activo"] = idActivo;
+    seleccion["id_activo"] = idResuelto;
     seleccion["fuente"] = "usuario";
     seleccion["seleccionado_at"] = DateTime.now().toIso8601String();
 
     alternativasSeleccionadas[
-    idActivo
+    idResuelto
     ] = seleccion;
 
     /*
@@ -2698,7 +2736,7 @@ class _ViewdiagnosticoasesorState
    * la propuesta.
    */
     activosSeleccionados.add(
-      idActivo,
+      idResuelto,
     );
   }
 

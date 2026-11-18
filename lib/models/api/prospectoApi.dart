@@ -281,9 +281,13 @@ Future<void> actualizarDecisionProspectoApi({
   }
 }
 
+// PARCHE_PROSPECTO_API_CONVERSION_V1
 Future<Map<String, dynamic>> convertirProspectoApi({
   required int idProspecto,
   required String nombreMipyme,
+  String? departamento,
+  String? municipio,
+  String? correo,
 }) async {
   final uri = Uri.parse('${Global.baseUrl}prospecto/$idProspecto/convertir');
 
@@ -298,7 +302,10 @@ Future<Map<String, dynamic>> convertirProspectoApi({
       'Authorization': 'Bearer $token',
     },
 
-    body: jsonEncode({'nombre_mipyme': nombreMipyme.trim()}),
+    body: jsonEncode({'nombre_mipyme': nombreMipyme.trim(),
+      if (departamento != null) 'departamento': departamento.trim(),
+      if (municipio != null) 'municipio': municipio.trim(),
+      if (correo != null) 'correo': correo.trim().toLowerCase()}),
   );
 
   if (response.statusCode == 401) {

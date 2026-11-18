@@ -2,6 +2,9 @@ import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/controllers/ClientController.dart';
 import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/models/api/ambientalApi.dart';
+import 'package:finanzas_verdes/views/asesor/client/fve/inventarioVerdePanel.dart';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -27,6 +30,9 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
   final comentarioGeneral = TextEditingController();
   final desplazamiento = ScrollController();
   final Map<String, TextEditingController> comentarios = {};
+  final Map<String, TextEditingController> justificaciones = {
+    for (final b in ['1', '3', '4', '5']) b: TextEditingController(),
+  };
 
   static const nombresBloques = <int, String>{
     1: 'Agua y energía',
@@ -34,8 +40,12 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
     3: 'Economía circular y residuos',
     4: 'Huella de carbono',
     5: 'Contexto normativo',
-    6: 'Estrategia ambiental',
+    6: 'Contexto estratégico',
   };
+
+  // Numeracion consecutiva en la interfaz; los IDs originales se conservan en BD.
+  static int numeroVisibleBloque(int bloque) =>
+      bloque >= 3 && bloque <= 6 ? bloque - 1 : bloque;
 
   static const descripcionesPuntaje = <String>[
     'Sin información / no aplica',
@@ -46,8 +56,22 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
     'Optimizado / mejora continua',
   ];
 
+  // Descripciones de la escala oficial de la Guia HORECA (pagina 3).
+  static const detallesPuntaje = <String>[
+    'No se evalua o no existe informacion suficiente.',
+    'No existe una practica, control o evidencia.',
+    'Existe una practica aislada, sin metodo ni medicion.',
+    'Hay acciones definidas, responsables o evidencias parciales.',
+    'Se aplica consistentemente y se mide el resultado.',
+    'Esta integrado al negocio, genera ahorro y mejora continua.',
+  ];
+
   Map<String, dynamic>? formulario;
   Map<String, dynamic>? evaluacion;
+  // Perfil independiente del cuestionario que se esta editando.
+  // Siempre se recupera desde la ultima evaluacion guardada en PostgreSQL.
+  Map<String, dynamic>? perfilGuardado;
+  String? errorPerfil;
   final Map<String, dynamic> respuestas = {};
   final Map<String, int> puntajes = {};
   List<Map<String, dynamic>> historial = [];
@@ -60,6 +84,8 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
   bool cambios = false;
   bool finalizada = false;
   bool viendoHistorial = false;
+  bool viendoPerfil = false;
+  bool viendoInventario = false;
 
   int? get idMipyme => int.tryParse(
         '${cliente.Client['mipyme']?['id_mipyme'] ?? ''}',
@@ -76,9 +102,8 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
   List<_PasoAmbiental> get pasos {
     final resultado = <_PasoAmbiental>[];
     for (var bloque = 1; bloque <= 6; bloque++) {
-      if (bloque == 2) {
-        resultado.add(const _PasoAmbiental(2, 'inventario'));
-      }
+      // Bloque 2: inventario en pestana independiente, no una pregunta.
+      if (bloque == 2) continue;
       for (final p in preguntas.where((p) => p['bloque'] == bloque)) {
         resultado.add(_PasoAmbiental(bloque, 'pregunta', p));
       }
@@ -119,6 +144,9 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
     for (final c in comentarios.values) {
       c.dispose();
     }
+    for (final c in justificaciones.values) {
+      c.dispose();
+    }
     comentarioGeneral.dispose();
     desplazamiento.dispose();
     if (cambios) controller.hasUnsavedChanges.value = false;
@@ -147,13 +175,67 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
 
   void irAPaso(int indice) {
     if (indice < 0 || indice >= pasos.length) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       viendoHistorial = false;
+      viendoPerfil = false;
+      viendoInventario = false;
       pasoActual = indice;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && desplazamiento.hasClients) desplazamiento.jumpTo(0);
     });
+  }
+
+  void seleccionarVista(String vista) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      viendoHistorial = vista == 'historial';
+      viendoPerfil = vista == 'perfil';
+      viendoInventario = vista == 'inventario';
+    });
+    // Actualizar desde PostgreSQL al abrir el perfil, sin alterar
+    // las respuestas ni los puntajes del cuestionario en edicion.
+    if (vista == 'perfil' && !cargando && !guardando) {
+      refrescarHistorial();
+    }
+  }
+
+  // La ultima evaluacion FINALIZADA tiene prioridad frente a borradores.
+  // Solo cuando no hay finalizadas se muestra el ultimo borrador guardado.
+  Map<String, dynamic>? elegirUltimaEvaluacion(
+      List<Map<String, dynamic>> registros) {
+    if (registros.isEmpty) return null;
+    final finalizadas = registros
+        .where((e) => e['estado'] == 'finalizada')
+        .toList();
+    final candidatas = finalizadas.isNotEmpty ? finalizadas : registros.toList();
+    candidatas.sort((a, b) {
+      DateTime? fecha(Map<String, dynamic> e) {
+        final valor = e['estado'] == 'finalizada'
+            ? (e['finalized_at'] ?? e['created_at'])
+            : e['created_at'];
+        return DateTime.tryParse('${valor ?? ''}');
+      }
+      final tA = fecha(a)?.millisecondsSinceEpoch ?? 0;
+      final tB = fecha(b)?.millisecondsSinceEpoch ?? 0;
+      final porFecha = tB.compareTo(tA);
+      if (porFecha != 0) return porFecha;
+      final idA = int.tryParse('${a['id_evaluacion']}') ?? 0;
+      final idB = int.tryParse('${b['id_evaluacion']}') ?? 0;
+      return idB.compareTo(idA);
+    });
+    return candidatas.first;
+  }
+
+  Future<Map<String, dynamic>?> leerUltimoPerfil(
+      List<Map<String, dynamic>> registros) async {
+    final ultima = elegirUltimaEvaluacion(registros);
+    if (ultima == null) return null;
+    final id = int.tryParse('${ultima['id_evaluacion']}');
+    if (id == null) return null;
+    final detalle = await AmbientalApi.obtener(id);
+    return Map<String, dynamic>.from(detalle['evaluacion'] as Map);
   }
 
   void irABloque(int bloque) {
@@ -171,14 +253,24 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
     try {
       final f = await AmbientalApi.formulario();
       final h = await AmbientalApi.listar(empresa);
+      final nuevasEvaluaciones = (h['evaluaciones'] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      Map<String, dynamic>? ultimoPerfil;
+      String? errorRecuperacion;
+      try {
+        ultimoPerfil = await leerUltimoPerfil(nuevasEvaluaciones);
+      } catch (_) {
+        errorRecuperacion = 'No fue posible recuperar el último perfil guardado.';
+      }
       if (!mounted) return;
       final form = Map<String, dynamic>.from(f['formulario'] as Map);
       prepararControladores(form);
       setState(() {
         formulario = form;
-        historial = (h['evaluaciones'] as List<dynamic>? ?? [])
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        historial = nuevasEvaluaciones;
+        perfilGuardado = ultimoPerfil;
+        errorPerfil = errorRecuperacion;
         activos = (h['activos'] as List<dynamic>? ?? [])
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
@@ -228,9 +320,14 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
         idEvaluacion = null;
         pasoActual = 0;
         viendoHistorial = false;
+        viendoPerfil = false;
+        viendoInventario = false;
         finalizada = false;
         respuestas.clear();
         puntajes.clear();
+        for (final c in justificaciones.values) {
+          c.clear();
+        }
         comentarioGeneral.clear();
         for (final c in comentarios.values) {
           c.clear();
@@ -263,6 +360,8 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
         idEvaluacion = id;
         finalizada = e['estado'] == 'finalizada';
         viendoHistorial = false;
+        viendoPerfil = false;
+        viendoInventario = false;
         pasoActual = 0;
         respuestas.clear();
         for (final c in comentarios.values) {
@@ -285,6 +384,14 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
         final guardados = Map<String, dynamic>.from(e['puntajes'] ?? {});
         for (final k in ['1', '3', '4', '5']) {
           if (guardados[k] is num) puntajes[k] = (guardados[k] as num).toInt();
+        }
+        final notasGuardadas = Map<String, dynamic>.from(
+          e['justificaciones_bloques'] is Map
+              ? e['justificaciones_bloques'] as Map
+              : <String, dynamic>{},
+        );
+        for (final b in ['1', '3', '4', '5']) {
+          justificaciones[b]!.text = '${notasGuardadas[b] ?? ''}';
         }
         comentarioGeneral.text = '${e['observacion_general'] ?? ''}';
         cambios = false;
@@ -330,6 +437,11 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
     return resultado;
   }
 
+  Map<String, String> justificacionesParaGuardar() => {
+    for (final entry in justificaciones.entries)
+      if (entry.value.text.trim().isNotEmpty) entry.key: entry.value.text.trim(),
+  };
+
   int? get primerPendiente {
     final lista = pasos;
     for (var i = 0; i < lista.length; i++) {
@@ -356,7 +468,7 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
       if (pendiente != null) {
         final paso = pasos[pendiente];
         avisar(paso.tipo == 'puntaje'
-            ? 'Falta la calificación del bloque ${paso.bloque}.'
+            ? 'Falta la calificación del bloque ${numeroVisibleBloque(paso.bloque)}.'
             : 'Falta responder la pregunta ${paso.pregunta!['numero']}.');
         irAPaso(pendiente);
         return;
@@ -391,6 +503,7 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
         idEvaluacion: idEvaluacion,
         respuestas: respuestasParaGuardar(),
         puntajes: Map<String, int>.from(puntajes),
+        justificaciones: justificacionesParaGuardar(),
         observacion: comentarioGeneral.text.trim(),
         finalizar: finalizar,
       );
@@ -399,6 +512,14 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
         evaluacion = Map<String, dynamic>.from(r['evaluacion'] as Map);
         idEvaluacion = int.tryParse('${evaluacion!['id_evaluacion']}');
         finalizada = evaluacion!['estado'] == 'finalizada';
+        // El perfil solo muestra resultados efectivamente guardados.
+        // Un nuevo borrador no sustituye un cierre anterior.
+        if (finalizada ||
+            perfilGuardado == null ||
+            perfilGuardado!['estado'] != 'finalizada') {
+          perfilGuardado = evaluacion;
+          errorPerfil = null;
+        }
         cambios = false;
         controller.hasUnsavedChanges.value = false;
       });
@@ -406,11 +527,15 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
       // no se debe mostrar un falso error de guardado.
       try {
         final h = await AmbientalApi.listar(idMipyme!);
+        final nuevosRegistros = (h['evaluaciones'] as List<dynamic>? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        final ultimoPerfil = await leerUltimoPerfil(nuevosRegistros);
         if (mounted) {
           setState(() {
-            historial = (h['evaluaciones'] as List<dynamic>? ?? [])
-                .map((e) => Map<String, dynamic>.from(e as Map))
-                .toList();
+            historial = nuevosRegistros;
+            perfilGuardado = ultimoPerfil;
+            errorPerfil = null;
             activos = (h['activos'] as List<dynamic>? ?? [])
                 .map((e) => Map<String, dynamic>.from(e as Map))
                 .toList();
@@ -452,56 +577,69 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
     required bool multiple,
     required VoidCallback? alPulsar,
   }) {
+    final esquema = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Semantics(
-        button: true,
-        selected: seleccionada,
-        label: 'Opción $letra: $texto',
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: alPulsar,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 62),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: tarjeta(seleccionada: seleccionada),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: seleccionada
-                        ? Global.primary
-                        : Global.primary.withOpacity(0.09),
-                    child: Text(
-                      letra,
-                      style: TextStyle(
-                        color: seleccionada ? Colors.white : Global.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: seleccionada
+            ? esquema.primary.withOpacity(0.055)
+            : esquema.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(
+            color: seleccionada
+                ? esquema.primary
+                : esquema.outline.withOpacity(0.26),
+            width: seleccionada ? 1.5 : 1,
+          ),
+        ),
+        child: InkWell(
+          onTap: alPulsar,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    letra,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: esquema.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      texto,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: seleccionada ? FontWeight.w600 : FontWeight.w400,
-                        color: Global.text,
-                      ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    texto,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: seleccionada
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: esquema.onSurface,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    multiple
-                        ? (seleccionada ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded)
-                        : (seleccionada ? Icons.radio_button_checked : Icons.radio_button_unchecked),
-                    color: seleccionada ? Global.primary : Global.textSecondary,
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                Icon(
+                  multiple
+                      ? (seleccionada
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded)
+                      : (seleccionada
+                          ? Icons.radio_button_checked_rounded
+                          : Icons.radio_button_unchecked_rounded),
+                  size: 21,
+                  color: seleccionada
+                      ? esquema.primary
+                      : esquema.onSurfaceVariant,
+                ),
+              ],
             ),
           ),
         ),
@@ -540,13 +678,13 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'PREGUNTA $numero DE ${preguntas.length}',
+          'PREGUNTA $numero DE ${preguntas.length}  ·  ${p['opcional'] == true ? 'OPCIONAL' : informativa ? 'VERIFICACIÓN' : 'OBLIGATORIA'}',
           style: TextStyle(color: Global.primary, fontWeight: FontWeight.w700, fontSize: 12),
         ),
         const SizedBox(height: 12),
         Text(
           '${p['texto']}',
-          style: TextStyle(color: Global.text, fontSize: 22, fontWeight: FontWeight.w700, height: 1.3),
+          style: TextStyle(color: Global.text, fontSize: MediaQuery.sizeOf(context).width < 600 ? 19 : 22, fontWeight: FontWeight.w600, height: 1.32),
         ),
         const SizedBox(height: 12),
         Text(
@@ -554,7 +692,7 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
               ? 'Información de verificación'
               : multiple
                   ? 'Puedes marcar varias respuestas.'
-                  : 'Selecciona una respuesta.',
+                  : 'Selecciona una opción.',
           style: TextStyle(color: Global.textSecondary),
         ),
         const SizedBox(height: 22),
@@ -608,8 +746,7 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
           onChanged: (_) => marcarCambio(),
           decoration: InputDecoration(
             labelText: 'Observación (opcional)',
-            hintText: 'Agrega contexto o evidencia cuando haga falta',
-            prefixIcon: const Icon(Icons.notes_rounded),
+            hintText: 'Detalle adicional, si es necesario',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
@@ -619,20 +756,64 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
 
   Widget calificacionActual(int bloque) {
     final elegida = puntajes['$bloque'];
+    final delBloque = preguntas.where((p) => p['bloque'] == bloque).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('CALIFICACIÓN DEL BLOQUE $bloque',
+        Text('CALIFICACIÓN DEL BLOQUE ${numeroVisibleBloque(bloque)}',
             style: TextStyle(color: Global.primary, fontWeight: FontWeight.w700, fontSize: 12)),
         const SizedBox(height: 12),
         Text('¿Qué nivel describe mejor al establecimiento?',
             style: TextStyle(color: Global.text, fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 10),
-        Text('Selecciona la calificación global de ${nombresBloques[bloque]}. '
-            'Esta nota no se calcula automáticamente a partir de las respuestas.',
-            style: TextStyle(color: Global.textSecondary)),
-        const SizedBox(height: 22),
-        for (var i = 0; i <= 5; i++)
+        cajaInfo('Revisa las respuestas del bloque. Selecciona una valoracion global '
+            'segun la escala de Sentido Verde. El sistema no asigna automaticamente '
+            'puntos por respuesta; el indicador AD-07 si se calcula automaticamente.'),
+        const SizedBox(height: 18),
+        Text('Respuestas que sustentan la valoracion',
+            style: TextStyle(color: Global.text, fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 10),
+        for (final p in delBloque) ...[
+          Builder(builder: (context) {
+            final k = '${p['numero']}';
+            final valor = valorDe(k);
+            final respuesta = p['tipo'] == 'informativa'
+                ? 'Verificacion por activo (no se responde aqui)'
+                : valor is List
+                    ? (valor.isEmpty ? 'Sin responder' : valor.join(', '))
+                    : (valor is String && valor.trim().isNotEmpty)
+                        ? valor
+                        : 'Sin responder';
+            final observacion = comentarios[k]?.text.trim() ?? '';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(13),
+                decoration: tarjeta(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Pregunta $k · ${p['texto']}',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Text(respuesta, style: TextStyle(color: Global.textSecondary)),
+                    if (observacion.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text('Observacion: $observacion',
+                          style: TextStyle(fontSize: 12, color: Global.textSecondary)),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+        const SizedBox(height: 8),
+        Text('Escala de madurez ambiental (0 a 5)',
+            style: TextStyle(color: Global.text, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        for (var i = 0; i <= 5; i++) ...[
           opcion(
             letra: '$i',
             texto: descripcionesPuntaje[i],
@@ -645,10 +826,34 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
                     marcarCambio();
                   },
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 8, 12),
+            child: Text(detallesPuntaje[i],
+                style: TextStyle(color: Global.textSecondary, fontSize: 12)),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextField(
+          controller: justificaciones['$bloque'],
+          readOnly: finalizada,
+          minLines: 2,
+          maxLines: 4,
+          maxLength: 1200,
+          onChanged: (_) => marcarCambio(),
+          decoration: InputDecoration(
+            labelText: 'Justificacion o evidencia de la calificacion (opcional)',
+            hintText: 'Por que seleccionaste este nivel, segun las respuestas y evidencias',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        if (ad07 != null)
+          cajaInfo('Indice AD-07 provisional: ${ad07!.toStringAsFixed(2)} / 5. '
+              'Promedio de los cuatro bloques calificados.'),
       ],
     );
   }
 
+  // El bloque 2 se gestiona aqui como inventario, no como pregunta del cuestionario.
   Widget inventarioActual() {
     final inventario = finalizada
         ? (evaluacion?['inventario_snapshot'] as List<dynamic>? ?? [])
@@ -656,16 +861,17 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('BLOQUE 2 · INVENTARIO',
+        Text('INVENTARIO VERDE HORECA',
             style: TextStyle(color: Global.primary, fontWeight: FontWeight.w700, fontSize: 12)),
         const SizedBox(height: 12),
-        Text('Activos registrados del negocio',
+        Text(finalizada ? 'Inventario al cierre de esta evaluacion' : 'Activos del establecimiento',
             style: TextStyle(color: Global.text, fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
-        cajaInfo('Este bloque no puntúa en AD-07. Aquí se muestran los activos registrados en el cliente. '
-            'La caracterización de las 18 categorías de HORECA se desarrollará en la siguiente entrega.',
-            icono: Icons.inventory_2_outlined),
-        const SizedBox(height: 20),
+        cajaInfo('El inventario de la Guia HORECA se gestiona por separado. '
+            'No tiene preguntas ni puntua en AD-07. Los equipos se registran '
+            'en Activos; la caracterizacion tecnica de las categorias MVP '
+            'se puede completar mas abajo.', icono: Icons.inventory_2_outlined),
+        const SizedBox(height: 18),
         if (inventario.isEmpty)
           const ListTile(title: Text('No hay activos registrados'))
         else
@@ -677,6 +883,14 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
                 subtitle: Text('Cantidad: ${item['cantidad'] ?? 1} · ${item['tipo'] ?? ''}'),
               ),
             ),
+        if (!finalizada && idMipyme != null) ...[
+          const SizedBox(height: 18),
+          InventarioVerdePanel(idMipyme: idMipyme!),
+        ],
+        if (finalizada)
+          cajaInfo('Esta es la fotografia del inventario al finalizar la visita. '
+              'No cambia aunque se actualicen los equipos posteriormente.',
+              icono: Icons.lock_outline),
       ],
     );
   }
@@ -699,14 +913,6 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
           icono: pendiente == null ? Icons.check_circle_outline : Icons.fact_check_outlined,
         ),
         const SizedBox(height: 18),
-        Card(
-          child: ListTile(
-            leading: Icon(Icons.insights_outlined, color: Global.primary),
-            title: Text('AD-07: ${ad07?.toStringAsFixed(2) ?? 'Pendiente'} / 5'),
-            subtitle: const Text('Promedio de bloques 1, 3, 4 y 5. No determina la aprobación del crédito.'),
-          ),
-        ),
-        const SizedBox(height: 14),
         for (final p in preguntas) ...[
           ListTile(
             dense: true,
@@ -731,7 +937,7 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
             dense: true,
             leading: Icon(puntajes.containsKey('$bloque') ? Icons.check_circle_outline : Icons.radio_button_unchecked,
                 color: puntajes.containsKey('$bloque') ? Global.primary : Global.textSecondary),
-            title: Text('Calificación del bloque $bloque'),
+            title: Text('Calificación del bloque ${numeroVisibleBloque(bloque)}'),
             subtitle: Text(puntajes.containsKey('$bloque') ? '${puntajes['$bloque']} de 5' : 'Pendiente'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => irAPaso(pasos.indexWhere((x) => x.tipo == 'puntaje' && x.bloque == bloque)),
@@ -757,29 +963,33 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
 
   Widget barraBloques(int bloqueActual) {
     return SizedBox(
-      height: 43,
-      child: ListView(
+      height: 42,
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        children: [
-          for (var b = 1; b <= 6; b++)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ActionChip(
-                backgroundColor: bloqueActual == b
-                    ? Global.primary.withOpacity(0.15)
-                    : Theme.of(context).colorScheme.surface,
-                avatar: CircleAvatar(
-                  radius: 12,
-                  backgroundColor: bloqueActual == b ? Global.primary : Global.text.withOpacity(0.08),
-                  child: Text('$b', style: TextStyle(fontSize: 11,
-                      color: bloqueActual == b ? Colors.white : Global.text)),
-                ),
-                label: Text(nombresBloques[b]!,
-                    style: TextStyle(color: Global.text, fontSize: 12)),
-                onPressed: () => irABloque(b),
+        itemCount: 5,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final numero = const [1, 3, 4, 5, 6][index];
+          final activo = numero == bloqueActual;
+          final esquema = Theme.of(context).colorScheme;
+          return TextButton(
+            onPressed: () => irABloque(numero),
+            style: TextButton.styleFrom(
+              foregroundColor: activo ? esquema.primary : esquema.onSurfaceVariant,
+              backgroundColor: activo
+                  ? esquema.primary.withOpacity(0.07)
+                  : Colors.transparent,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
-        ],
+            child: Text(
+              '${numeroVisibleBloque(numero)}. ${nombresBloques[numero]}',
+              style: TextStyle(fontSize: 12, fontWeight: activo ? FontWeight.w600 : FontWeight.w400),
+            ),
+          );
+        },
       ),
     );
   }
@@ -788,15 +998,230 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
     if (idMipyme == null) return;
     try {
       final h = await AmbientalApi.listar(idMipyme!);
+      final nuevosRegistros = (h['evaluaciones'] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final ultimoPerfil = await leerUltimoPerfil(nuevosRegistros);
       if (!mounted) return;
       setState(() {
-        historial = (h['evaluaciones'] as List<dynamic>? ?? [])
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        historial = nuevosRegistros;
+        perfilGuardado = ultimoPerfil;
+        errorPerfil = null;
       });
     } catch (e) {
       avisar(e);
     }
+  }
+
+  Widget perfilAmbientalVista() {
+    final tema = Theme.of(context);
+    final nombreEmpresa =
+        '${cliente.Client['mipyme']?['nombre_mipyme'] ?? ''}'.trim();
+
+    if (perfilGuardado == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            errorPerfil ?? 'Esta empresa no tiene evaluaciones guardadas. '
+                'Guarda o finaliza el cuestionario para consultar su perfil.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: tema.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+
+    final puntajesPerfil = <String, int>{};
+    final almacenados = perfilGuardado!['puntajes'];
+    if (almacenados is Map) {
+      for (final bloque in [1, 3, 4, 5]) {
+        final raw = almacenados['$bloque'];
+        if (raw is num && raw >= 0 && raw <= 5 && raw == raw.roundToDouble()) {
+          puntajesPerfil['$bloque'] = raw.toInt();
+        }
+      }
+    }
+    final valores = [for (final bloque in [1, 3, 4, 5]) puntajesPerfil['$bloque']];
+    final completo = valores.every((valor) => valor != null);
+    final double? indicePerfil = completo
+        ? valores.fold<int>(0, (suma, valor) => suma + valor!) / 4
+        : null;
+    final estaFinalizada = perfilGuardado!['estado'] == 'finalizada';
+    final fecha = fechaCorta(perfilGuardado!['fecha_visita'] ??
+        perfilGuardado!['fecha_evaluacion'] ?? '');
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Perfil ambiental',
+                style: TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w600,
+                  color: tema.colorScheme.onSurface,
+                ),
+              ),
+              if (nombreEmpresa.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  nombreEmpresa,
+                  style: TextStyle(color: tema.colorScheme.onSurfaceVariant),
+                ),
+              ],
+              const SizedBox(height: 7),
+              Text(
+                '${estaFinalizada ? 'Última evaluación finalizada' : 'Último borrador guardado'}'
+                '${fecha.isEmpty ? '' : ' · $fecha'}',
+                style: TextStyle(fontSize: 12, color: tema.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    indicePerfil == null ? 'Pendiente' : indicePerfil.toStringAsFixed(2),
+                    style: TextStyle(
+                      fontSize: 38,
+                      height: 1,
+                      fontWeight: FontWeight.w600,
+                      color: tema.colorScheme.onSurface,
+                    ),
+                  ),
+                  if (indicePerfil != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, bottom: 3),
+                      child: Text(
+                        '/ 5',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: tema.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Índice de madurez ambiental · AD-07',
+                style: TextStyle(fontSize: 13, color: tema.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 26),
+              Divider(color: tema.colorScheme.outline.withOpacity(0.25), height: 1),
+              const SizedBox(height: 20),
+              LayoutBuilder(
+                builder: (context, espacio) {
+                  final detalle = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final bloque in [1, 3, 4, 5]) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  nombresBloques[bloque]!,
+                                  style: TextStyle(
+                                    color: tema.colorScheme.onSurface,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                puntajesPerfil['$bloque'] == null
+                                    ? 'Pendiente'
+                                    : '${puntajesPerfil['$bloque']} / 5',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: tema.colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if ((perfilGuardado!['justificaciones_bloques'] is Map) &&
+                            ('${(perfilGuardado!['justificaciones_bloques'] as Map)['$bloque'] ?? ''}'.trim().isNotEmpty))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Justificacion: ${(perfilGuardado!['justificaciones_bloques'] as Map)['$bloque']}',
+                                style: TextStyle(fontSize: 12, color: tema.colorScheme.onSurfaceVariant),
+                              ),
+                            ),
+                          ),
+                        Divider(height: 1, color: tema.colorScheme.outline.withOpacity(0.15)),
+                      ],
+                    ],
+                  );
+                  final grafico = SizedBox(
+                    width: 265,
+                    height: 265,
+                    child: completo
+                        ? CustomPaint(
+                            painter: _RadarAmbientalPainter(
+                              valores.map((v) => v!.toDouble()).toList(),
+                              color: tema.colorScheme.primary,
+                              linea: tema.colorScheme.outline.withOpacity(0.28),
+                            ),
+                          )
+                        : Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(
+                                'Completa las cuatro calificaciones para ver el gráfico.',
+                                style: TextStyle(
+                                  color: tema.colorScheme.onSurfaceVariant,
+                                  fontSize: 13,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                  );
+                  if (espacio.maxWidth < 650) {
+                    return Column(
+                      children: [
+                        SizedBox(width: double.infinity, child: detalle),
+                        const SizedBox(height: 18),
+                        grafico,
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(child: detalle),
+                      const SizedBox(width: 34),
+                      grafico,
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              Text(
+                estaFinalizada
+                    ? 'Resultado guardado de la última evaluación finalizada.'
+                    : 'Borrador guardado. El resultado se confirmará al finalizar.',
+                style: TextStyle(
+                  color: tema.colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget historialVista() {
@@ -874,7 +1299,7 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
           final adelante = FilledButton.icon(
             onPressed: esUltimo
                 ? (finalizada
-                    ? () => setState(() => viendoHistorial = true)
+                    ? () => seleccionarVista('historial')
                     : guardando ? null : () => guardar(true))
                 : () => irAPaso(pasoActual + 1),
             icon: Icon(esUltimo
@@ -944,11 +1369,39 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
     final indice = pasoActual >= lista.length ? lista.length - 1 : pasoActual;
     final actual = lista[indice];
     final ultimo = indice == lista.length - 1;
+    final tema = Theme.of(context);
+    final vista = viendoHistorial
+        ? 'historial'
+        : viendoPerfil
+            ? 'perfil'
+            : viendoInventario
+                ? 'inventario'
+                : 'cuestionario';
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 9),
+    Widget pestana(String id, String titulo) {
+      final seleccionada = vista == id;
+      return TextButton(
+        onPressed: () => seleccionarVista(id),
+        style: TextButton.styleFrom(
+          foregroundColor: seleccionada
+              ? tema.colorScheme.primary
+              : tema.colorScheme.onSurfaceVariant,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        ),
+        child: Text(
+          titulo,
+          style: TextStyle(
+            fontWeight: seleccionada ? FontWeight.w600 : FontWeight.w400,
+            decoration: seleccionada ? TextDecoration.underline : TextDecoration.none,
+            decorationColor: tema.colorScheme.primary,
+          ),
+        ),
+      );
+    }
+
+    final esMovil = MediaQuery.sizeOf(context).width < 600;
+    final encabezado = Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1000),
@@ -957,88 +1410,217 @@ class _VisitaAmbientalAsesorState extends State<VisitaAmbientalAsesor> {
                 children: [
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 10,
+                    spacing: 12,
                     runSpacing: 6,
                     children: [
-                      Text('Evaluación ambiental HORECA',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Global.text)),
+                      Text(
+                        'Diagnóstico ambiental',
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w600,
+                          color: tema.colorScheme.onSurface,
+                        ),
+                      ),
                       if (finalizada)
-                        Chip(label: const Text('Finalizada'),
-                            avatar: Icon(Icons.lock, size: 16, color: Global.primary)),
+                        Text('Finalizada', style: TextStyle(fontSize: 12, color: tema.colorScheme.onSurfaceVariant)),
                       if (cambios)
-                        const Chip(label: Text('Sin guardar'), avatar: Icon(Icons.circle, size: 11)),
+                        Text('Cambios sin guardar', style: TextStyle(fontSize: 12, color: tema.colorScheme.onSurfaceVariant)),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Wrap(spacing: 8, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                    Text('${formulario?['codigo']} · $respondidasObligatorias/$totalObligatorias obligatorias respondidas',
-                        style: TextStyle(color: Global.textSecondary, fontSize: 12)),
-                    TextButton.icon(
-                      onPressed: () => setState(() => viendoHistorial = !viendoHistorial),
-                      icon: Icon(viendoHistorial ? Icons.edit_note : Icons.history),
-                      label: Text(viendoHistorial ? 'Volver al formulario' : 'Ver historial'),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 45,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        pestana('cuestionario', 'Cuestionario'),
+                        pestana('inventario', 'Inventario de activos'),
+                        pestana('perfil', 'Perfil ambiental'),
+                        pestana('historial', 'Historial'),
+                        TextButton.icon(
+                          onPressed: guardando ? null : nuevaEvaluacion,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Nueva evaluación'),
+                        ),
+                      ],
                     ),
-                    TextButton.icon(
-                      onPressed: guardando ? null : nuevaEvaluacion,
-                      icon: const Icon(Icons.add_circle_outline),
-                      label: const Text('Nueva evaluación'),
-                    ),
-                  ]),
-                  if (!viendoHistorial) ...[
-                    const SizedBox(height: 10),
+                  ),
+                  if (vista == 'cuestionario') ...[
+                    const SizedBox(height: 12),
                     Row(
                       children: [
-                        Expanded(child: Text(actual.tipo == 'resumen'
-                            ? 'Revisión y cierre'
-                            : 'Bloque ${actual.bloque}: ${nombresBloques[actual.bloque]}',
-                            style: TextStyle(color: Global.text, fontWeight: FontWeight.w600))),
-                        Text('Paso ${indice + 1} de ${lista.length}', style: TextStyle(color: Global.textSecondary, fontSize: 12)),
+                        Expanded(
+                          child: Text(
+                            actual.tipo == 'resumen'
+                                ? 'Revisión y cierre'
+                                : 'Bloque ${numeroVisibleBloque(actual.bloque)} · ${nombresBloques[actual.bloque]}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: tema.colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          'Paso ${indice + 1} de ${lista.length}',
+                          style: TextStyle(color: tema.colorScheme.onSurfaceVariant, fontSize: 12),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: (indice + 1) / lista.length,
-                        minHeight: 6,
-                        backgroundColor: Global.primary.withOpacity(0.13),
-                        color: Global.primary,
-                      ),
+                    LinearProgressIndicator(
+                      value: (indice + 1) / lista.length,
+                      minHeight: 4,
+                      backgroundColor: tema.colorScheme.primary.withOpacity(0.10),
+                      color: tema.colorScheme.primary,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 9),
+                    Text(
+                      '$respondidasObligatorias de $totalObligatorias preguntas obligatorias respondidas',
+                      style: TextStyle(color: tema.colorScheme.onSurfaceVariant, fontSize: 12),
+                    ),
+                    const SizedBox(height: 7),
                     barraBloques(actual.bloque),
                   ],
                 ],
               ),
             ),
           ),
-        ),
+        );
+
+    return Column(
+      children: [
+        if (!esMovil || vista != 'cuestionario') encabezado,
         Expanded(
           child: viendoHistorial
               ? historialVista()
-              : SingleChildScrollView(
-                  controller: desplazamiento,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 820),
-                      child: Container(
-                        padding: const EdgeInsets.all(22),
-                        decoration: tarjeta(),
-                        child: actual.tipo == 'pregunta'
-                            ? preguntaActual(actual.pregunta!)
-                            : actual.tipo == 'puntaje'
-                                ? calificacionActual(actual.bloque)
-                                : actual.tipo == 'inventario'
-                                    ? inventarioActual()
-                                    : revisionFinal(),
+              : viendoPerfil
+                  ? perfilAmbientalVista()
+                  : viendoInventario
+                      ? SingleChildScrollView(
+                          padding: const EdgeInsets.all(18),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 820),
+                              child: inventarioActual(),
+                            ),
+                          ),
+                        )
+                  : SingleChildScrollView(
+                      controller: desplazamiento,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (esMovil) encabezado,
+                          Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 820),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: actual.tipo == 'pregunta'
+                                    ? preguntaActual(actual.pregunta!)
+                                    : actual.tipo == 'puntaje'
+                                        ? calificacionActual(actual.bloque)
+                                        : actual.tipo == 'inventario'
+                                            ? inventarioActual()
+                                            : revisionFinal(),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ),
         ),
-        if (!viendoHistorial) pieNavegacion(ultimo),
+        if (vista == 'cuestionario') pieNavegacion(ultimo),
       ],
     );
   }
+}
+
+// Radar de los cuatro bloques que componen AD-07.
+// No representa valores ausentes como cero: solo se dibuja con cuatro notas.
+class _RadarAmbientalPainter extends CustomPainter {
+  final List<double> valores;
+  final Color color;
+  final Color linea;
+
+  const _RadarAmbientalPainter(this.valores, {required this.color, required this.linea});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centro = Offset(size.width / 2, size.height / 2);
+    final radio = math.min(size.width, size.height) * 0.37;
+
+    Offset punto(int eje, double fraccion) {
+      final angulo = -math.pi / 2 + eje * math.pi / 2;
+      return Offset(
+        centro.dx + radio * fraccion * math.cos(angulo),
+        centro.dy + radio * fraccion * math.sin(angulo),
+      );
+    }
+
+    final guias = Paint()
+      ..color = linea
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    for (final nivel in [0.25, 0.5, 0.75, 1.0]) {
+      final figura = Path()..moveTo(punto(0, nivel).dx, punto(0, nivel).dy);
+      for (var i = 1; i < 4; i++) {
+        final p = punto(i, nivel);
+        figura.lineTo(p.dx, p.dy);
+      }
+      figura.close();
+      canvas.drawPath(figura, guias);
+    }
+    for (var i = 0; i < 4; i++) {
+      canvas.drawLine(centro, punto(i, 1), guias);
+      final etiqueta = TextPainter(
+        text: TextSpan(
+          text: 'B${[1, 3, 4, 5][i]}',
+          style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final posicion = punto(i, 1.18);
+      etiqueta.paint(
+        canvas,
+        Offset(posicion.dx - etiqueta.width / 2, posicion.dy - etiqueta.height / 2),
+      );
+    }
+
+    final perfil = Path();
+    for (var i = 0; i < 4; i++) {
+      final p = punto(i, valores[i].clamp(0, 5) / 5);
+      if (i == 0) {
+        perfil.moveTo(p.dx, p.dy);
+      } else {
+        perfil.lineTo(p.dx, p.dy);
+      }
+    }
+    perfil.close();
+    canvas.drawPath(perfil, Paint()..color = color.withOpacity(0.14));
+    canvas.drawPath(
+      perfil,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    for (var i = 0; i < 4; i++) {
+      canvas.drawCircle(
+        punto(i, valores[i].clamp(0, 5) / 5),
+        3.5,
+        Paint()..color = color,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RadarAmbientalPainter oldDelegate) =>
+      color != oldDelegate.color ||
+      linea != oldDelegate.linea ||
+      !List.generate(4, (i) => valores[i] == oldDelegate.valores[i]).every((x) => x);
 }

@@ -1,12 +1,14 @@
-
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/models/api/prospectoApi.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/models/api/calendarioApi.dart';
 
 class ProspectosGestionAsesor extends StatefulWidget {
-  const ProspectosGestionAsesor({super.key});
+  // PARCHE_PROSPECTO_WIDGET_V1
+  final Future<void> Function()? onConvertido;
+  const ProspectosGestionAsesor({super.key, this.onConvertido});
 
   @override
   State<ProspectosGestionAsesor> createState() =>
@@ -47,6 +49,17 @@ class _ProspectosGestionAsesorState
     _solicitud++;
     _busqueda.dispose();
     super.dispose();
+  }
+
+  // Mantiene los mismos nombres del catalogo de empresas, incluso si un
+  // prospecto anterior los registro con mayusculas diferentes.
+  String? _opcionUbicacion(Iterable<String> opciones, Object? valor) {
+    final buscado = (valor ?? '').toString().trim().toLowerCase();
+    if (buscado.isEmpty) return null;
+    for (final opcion in opciones) {
+      if (opcion.toLowerCase() == buscado) return opcion;
+    }
+    return null;
   }
 
   String _mensaje(Object e) =>
@@ -110,6 +123,8 @@ class _ProspectosGestionAsesorState
     final datos = <String, String>{};
     final form = GlobalKey<FormState>();
     bool guardando = false;
+    String? departamentoSeleccionado;
+    String? municipioSeleccionado;
 
     Widget campo(
         String key,
@@ -121,8 +136,24 @@ class _ProspectosGestionAsesorState
         padding: const EdgeInsets.only(bottom: 12),
         child: TextFormField(
           keyboardType: keyboard,
-          onSaved: (v) => datos[key] = v?.trim() ?? '',
-          maxLength: key == 'documento' ? 15 : null,
+          autovalidateMode: (key == 'documento' || key == 'telefono' || key == 'correo')
+              ? AutovalidateMode.onUserInteraction
+              : AutovalidateMode.disabled,
+          inputFormatters: key == 'documento' || key == 'telefono'
+              ? <TextInputFormatter>[
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(15),
+                ]
+              : key == 'correo'
+                  ? <TextInputFormatter>[
+                      FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                      LengthLimitingTextInputFormatter(150),
+                    ]
+                  : null,
+          onSaved: (v) => datos[key] = key == 'correo'
+              ? (v?.trim().toLowerCase() ?? '')
+              : (v?.trim() ?? ''),
+          maxLength: key == 'documento' || key == 'telefono' ? 15 : null,
           decoration: InputDecoration(
             labelText: label,
             border: const OutlineInputBorder(),
@@ -138,6 +169,12 @@ class _ProspectosGestionAsesorState
             if (key == 'documento' &&
                 !RegExp(r'^\d{5,15}$').hasMatch(text)) {
               return 'Documento de 5 a 15 dígitos';
+            }
+
+            if (key == 'telefono' &&
+                text.isNotEmpty &&
+                !RegExp(r'^\d{7,15}$').hasMatch(text)) {
+              return 'Teléfono de 7 a 15 dígitos';
             }
 
             if (key == 'correo' &&
@@ -196,7 +233,57 @@ class _ProspectosGestionAsesorState
                     keyboard: TextInputType.emailAddress,
                   ),
                   campo('nombre_negocio', 'Nombre del negocio'),
-                  campo('municipio', 'Municipio'),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: DropdownButtonFormField<String>(
+                      value: departamentoSeleccionado,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Departamento',
+                        hintText: 'Seleccionar departamento',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: Global.ubicaciones.keys.map((departamento) =>
+                          DropdownMenuItem<String>(
+                            value: departamento,
+                            child: Text(departamento, overflow: TextOverflow.ellipsis),
+                          )).toList(),
+                      onChanged: (valor) => updateDialog(() {
+                        departamentoSeleccionado = valor;
+                        municipioSeleccionado = null;
+                      }),
+                      onSaved: (_) => datos['departamento'] = departamentoSeleccionado ?? '',
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('prospecto-municipio-${departamentoSeleccionado ?? 'sin-departamento'}'),
+                      value: municipioSeleccionado,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Municipio',
+                        hintText: departamentoSeleccionado == null
+                            ? 'Primero selecciona departamento'
+                            : 'Seleccionar municipio',
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: (departamentoSeleccionado == null
+                          ? <String>[]
+                          : Global.ubicaciones[departamentoSeleccionado!]!
+                              .keys.toList()).map((municipio) =>
+                          DropdownMenuItem<String>(
+                            value: municipio,
+                            child: Text(municipio, overflow: TextOverflow.ellipsis),
+                          )).toList(),
+                      onChanged: departamentoSeleccionado == null
+                          ? null
+                          : (valor) => updateDialog(() => municipioSeleccionado = valor),
+                      onSaved: (_) => datos['municipio'] = municipioSeleccionado ?? '',
+                    ),
+                  ),
                   campo('direccion_negocio', 'Dirección del negocio'),
                 ],
               ),
@@ -268,6 +355,177 @@ class _ProspectosGestionAsesorState
 
     _avisar('Prospecto registrado correctamente.');
     _cargar(pagina: 1);
+  }
+
+  Future<void> _convertirProspecto(Map<String, dynamic> prospecto) async {
+    if (_procesando) return;
+    final id = int.tryParse('${prospecto['id_prospecto']}');
+    if (id == null) return;
+
+    String negocio = '${prospecto['nombre_negocio'] ?? ''}'.trim();
+    final departamentoOriginal = '${prospecto['departamento'] ?? ''}'.trim();
+    final municipioOriginal = '${prospecto['municipio'] ?? ''}'.trim();
+    final departamentoInicial = _opcionUbicacion(
+      Global.ubicaciones.keys, departamentoOriginal,
+    );
+    String? departamento = departamentoInicial;
+    String? municipio = departamento == null ? null : _opcionUbicacion(
+      Global.ubicaciones[departamento]!.keys, municipioOriginal,
+    );
+    String correo = '${prospecto['correo'] ?? ''}'.trim();
+    bool guardando = false;
+    final form = GlobalKey<FormState>();
+
+    final seleccion = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, actualizar) => AlertDialog(
+          title: const Text('Convertir prospecto en cliente'),
+          scrollable: true,
+          content: SizedBox(
+            width: 470,
+            child: Form(
+              key: form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Prospecto: ${prospecto['nombres'] ?? ''} ${prospecto['apellidos'] ?? ''}'),
+                  const SizedBox(height: 8),
+                  const Text('La conversión crea la ficha del cliente y de la empresa. No aprueba créditos.'),
+                  const SizedBox(height: 10),
+                  const Text('Los datos que ya se registraron se trasladarán automáticamente. Solo completa los faltantes.'),
+                  Text('Dirección: ${prospecto['direccion_negocio'] ?? 'Sin registrar'}'),
+                  const SizedBox(height: 18),
+                  TextFormField(
+                    initialValue: negocio,
+                    maxLength: 180,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre de la mipyme *',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => negocio = v.trim(),
+                    validator: (v) => (v?.trim().isEmpty ?? true)
+                        ? 'Indica el nombre del negocio' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: departamento,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Departamento',
+                      hintText: 'Seleccionar departamento',
+                      helperText: 'Se conservará en la ficha de la empresa.',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: Global.ubicaciones.keys.map((item) =>
+                        DropdownMenuItem<String>(
+                          value: item,
+                          child: Text(item, overflow: TextOverflow.ellipsis),
+                        )).toList(),
+                    onChanged: (valor) => actualizar(() {
+                      departamento = valor;
+                      municipio = null;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('conversion-municipio-${departamento ?? 'sin-departamento'}'),
+                    value: municipio,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Municipio',
+                      hintText: departamento == null
+                          ? 'Primero selecciona departamento'
+                          : 'Seleccionar municipio',
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: (departamento == null ? <String>[]
+                        : Global.ubicaciones[departamento]!.keys.toList())
+                        .map((item) => DropdownMenuItem<String>(
+                          value: item,
+                          child: Text(item, overflow: TextOverflow.ellipsis),
+                        )).toList(),
+                    onChanged: departamento == null
+                        ? null
+                        : (valor) => actualizar(() => municipio = valor),
+                  ),
+                  if (municipio == null && municipioOriginal.isNotEmpty &&
+                      departamento == departamentoInicial)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Municipio registrado: $municipioOriginal. '
+                        'Se conservará si no seleccionas otro.',
+                        style: Theme.of(ctx).textTheme.bodySmall,
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: correo,
+                    keyboardType: TextInputType.emailAddress,
+                    maxLength: 150,
+                    decoration: const InputDecoration(
+                      labelText: 'Correo del cliente *',
+                      helperText: 'Necesario para registrar al cliente; no se enviará una clave automáticamente.',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => correo = v.trim(),
+                    validator: (v) => RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                            .hasMatch(v?.trim() ?? '')
+                        ? null : 'Ingresa un correo válido',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: guardando ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton.icon(
+              onPressed: guardando ? null : () {
+                if (form.currentState?.validate() != true) return;
+                actualizar(() => guardando = true);
+                Navigator.pop(ctx, <String, String>{
+                  'nombre_mipyme': negocio,
+                  'departamento': departamento ?? '',
+                  'municipio': municipio ??
+                      (departamento == departamentoInicial ? municipioOriginal : ''),
+                  'correo': correo.trim().toLowerCase(),
+                });
+              },
+              icon: const Icon(Icons.person_add_alt_1_rounded),
+              label: const Text('Confirmar conversión'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || seleccion == null) return;
+
+    setState(() => _procesando = true);
+    try {
+      await convertirProspectoApi(
+        idProspecto: id,
+        nombreMipyme: seleccion['nombre_mipyme']!,
+        departamento: seleccion['departamento'],
+        municipio: seleccion['municipio'],
+        correo: seleccion['correo']!,
+      );
+      if (!mounted) return;
+      _avisar('Prospecto convertido. Ya aparece en Clientes activos.');
+      if (widget.onConvertido != null) {
+        await widget.onConvertido!();
+      } else {
+        await _cargar(pagina: 1);
+      }
+    } catch (e) {
+      if (mounted) _avisar(_mensaje(e));
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
   }
 
   Future<void> _cambiarEstado(
@@ -445,6 +703,10 @@ class _ProspectosGestionAsesorState
                           '\nMotivo: $motivo';
                         }
 
+                      } else if (tipo == 'conversion_cliente') {
+                        titulo = 'Convertido en cliente';
+                        descripcion = 'Empresa #${detalle['id_mipyme'] ?? ''} - '
+                            '${detalle['nombre_mipyme'] ?? ''}';
                       } else if (tipo == 'agendamiento') {
                         titulo = 'Visita agendada';
 
@@ -804,7 +1066,7 @@ class _ProspectosGestionAsesorState
             'Negocio: ${valor(p['nombre_negocio'])}',
           ),
           Text(
-            'Municipio: ${valor(p['municipio'])}',
+            'Ubicación: ${[p['municipio'], p['departamento']].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ')}',
           ),
           Text(
             'Contacto: ${valor(p['telefono'] ?? p['correo'])}',
@@ -856,7 +1118,16 @@ class _ProspectosGestionAsesorState
                 ),
               ],
             ),
-          if (!disponible)
+          if (estado == 'en_gestion' || estado == 'agendado')
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: FilledButton.icon(
+                onPressed: _procesando ? null : () => _convertirProspecto(p),
+                icon: const Icon(Icons.how_to_reg_outlined, size: 18),
+                label: const Text('Convertir en cliente'),
+              ),
+            ),
+          if (!disponible && estado != 'agendado')
             Text(
               'Sin acciones pendientes en esta etapa.',
               style: TextStyle(

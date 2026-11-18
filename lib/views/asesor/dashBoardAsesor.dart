@@ -1,5 +1,6 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:finanzas_verdes/app/config/Global.dart';
+import 'package:finanzas_verdes/controllers/ClientController.dart';
 import 'package:finanzas_verdes/app/routes/subrutes/adminRoutes.dart';
 import 'package:finanzas_verdes/app/routes/subrutes/asesorRoutes.dart';
 import 'package:finanzas_verdes/main.dart';
@@ -77,7 +78,10 @@ class _DashboardasesorState
           ),
 
           // Menú flotante solamente en móvil.
-          bottomNavigationBar: isDesktop
+          bottomNavigationBar: isDesktop ||
+                  (controller.Page == AsesorRoutes.dashBoardClient &&
+                   Get.isRegistered<ClientController>() &&
+                   Get.find<ClientController>().selectedClientSection.value == 4)
               ? null
               : _buildFloatingBottomMenu(),
         ),
