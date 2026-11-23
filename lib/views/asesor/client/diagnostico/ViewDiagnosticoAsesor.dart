@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:finanzas_verdes/services/diagnostico_pdf_service.dart';
 import 'package:finanzas_verdes/views/asesor/client/diagnostico/seleccionarAlternativaDiagnostico.dart';
 
 class Viewdiagnosticoasesor extends StatefulWidget {
@@ -24,6 +25,7 @@ class _ViewdiagnosticoasesorState
     extends State<Viewdiagnosticoasesor> {
   bool loading = false;
   bool _startingFve = false;
+  bool _generandoPdf = false;
 
   final ClientController clientController =
   Get.find<ClientController>();
@@ -530,6 +532,34 @@ class _ViewdiagnosticoasesorState
               ],
             ),
           ),
+          if (clientController.Diagnostico.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            if (isMobile)
+              IconButton(
+                tooltip: 'Generar PDF',
+                onPressed: _generandoPdf ? null : _generarPdf,
+                icon: _generandoPdf
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(Icons.picture_as_pdf_outlined,
+                        color: Global.primary),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: _generandoPdf ? null : _generarPdf,
+                icon: _generandoPdf
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                label: Text(_generandoPdf ? 'Generando...' : 'Generar PDF'),
+              ),
+          ],
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 10,
@@ -570,6 +600,56 @@ class _ViewdiagnosticoasesorState
   }
 
   // Muestra errores visibles incluso cuando un snackbar no llega a aparecer.
+  Future<void> _generarPdf() async {
+    if (_generandoPdf) return;
+
+    final diagnostico = clientController.Diagnostico;
+    if (diagnostico.isEmpty) return;
+
+    setState(() => _generandoPdf = true);
+    try {
+      final datosActivos = <Map<String, dynamic>>[];
+
+      for (final raw in _getActivosOrdenados(diagnostico)) {
+        if (raw is! Map) continue;
+        final activo = Map<String, dynamic>.from(raw);
+        final idActivo = _toInt(activo['id_activo']);
+        final alternativa = idActivo == null
+            ? null
+            : alternativasSeleccionadas[idActivo];
+
+        datosActivos.add({
+          'id_activo': idActivo,
+          'nombre_activo': activo['nombre_activo'],
+          'prioridad': activo['prioridad'],
+          'incluido': idActivo != null && activosSeleccionados.contains(idActivo),
+          'metricas': _getMetricasVisualesActivo(activo),
+          'confianza': activo['confianza'],
+          'alternativa': alternativa == null
+              ? null
+              : Map<String, dynamic>.from(alternativa),
+        });
+      }
+
+      await DiagnosticoPdfService.exportar(
+        diagnostico: Map<String, dynamic>.from(diagnostico),
+        resumenSeleccion: Map<String, dynamic>.from(getMetricasSeleccionadas()),
+        activos: datosActivos,
+      );
+    } catch (e) {
+      debugPrint('Error al exportar diagnóstico PDF: $e');
+      Get.snackbar(
+        'No fue posible generar el PDF',
+        'Verifica los datos del diagnóstico y vuelve a intentarlo.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade700,
+        colorText: Colors.white,
+      );
+    } finally {
+      if (mounted) setState(() => _generandoPdf = false);
+    }
+  }
+
   Future<void> _mensajeFve(String titulo, String detalle) async {
     if (!mounted) return;
     await showDialog<void>(

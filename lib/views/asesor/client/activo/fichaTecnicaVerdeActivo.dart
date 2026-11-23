@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/models/api/fveInventarioApi.dart';
 import 'package:finanzas_verdes/views/asesor/client/activo/campoTecnicoVerde.dart';
+import 'package:finanzas_verdes/views/asesor/client/activo/perfilUsoActivo.dart';
 import 'package:flutter/material.dart';
 
 /// Datos tecnicos opcionales del equipo actual, dentro de su ficha de Activos.
@@ -11,6 +12,9 @@ class FichaTecnicaVerdeActivo extends StatefulWidget {
   final String nombre;
   final ValueChanged<Map<String, dynamic>?> onChanged;
   final bool aplicarSugerenciasIA;
+  final Map<String, dynamic>? perfilUsoInicial;
+  final dynamic horarioEmpresa;
+  final ValueChanged<Map<String, dynamic>?>? onPerfilUsoChanged;
 
   const FichaTecnicaVerdeActivo({
     super.key,
@@ -19,6 +23,9 @@ class FichaTecnicaVerdeActivo extends StatefulWidget {
     required this.nombre,
     required this.onChanged,
     this.aplicarSugerenciasIA = false,
+    this.perfilUsoInicial,
+    this.horarioEmpresa,
+    this.onPerfilUsoChanged,
   });
 
   @override
@@ -383,6 +390,19 @@ class _FichaTecnicaVerdeActivoState extends State<FichaTecnicaVerdeActivo> {
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('Actualizar información')),
             ]),
+          ],
+          // FVE_USO_ACTIVOS_V2: la captura de uso pertenece a la misma ficha.
+          if (widget.onPerfilUsoChanged != null) ...[
+            const SizedBox(height: 20),
+            Divider(color: tema.dividerColor.withOpacity(0.55)),
+            const SizedBox(height: 16),
+            PerfilUsoActivo(
+              key: ValueKey("uso-${widget.idActivo ?? 'nuevo'}-${widget.tipo}"),
+              tipo: widget.tipo,
+              inicial: widget.perfilUsoInicial,
+              horarioEmpresa: widget.horarioEmpresa,
+              onChanged: widget.onPerfilUsoChanged!,
+            ),
           ],
         ]),
       ),

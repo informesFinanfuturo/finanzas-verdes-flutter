@@ -17,6 +17,7 @@ import 'package:finanzas_verdes/views/asesor/client/mipyme/infoMipymeDashBoardAs
 import 'package:finanzas_verdes/views/asesor/client/plan_trabajo/ViewPlanTrabajosAsesor.dart';
 import 'package:finanzas_verdes/views/asesor/client/visita/Viewvisitasclienteasesor.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:finanzas_verdes/services/fve_presentacion_backend_api.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -168,6 +169,51 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
     );
+  }
+
+
+  // FVE_PPTX_BACKEND_V1: el navegador no construye el PowerPoint.
+  bool _pptxGenerandoDesdeApi = false;
+  String _pptxEstadoApi = '';
+
+  Future<void> _exportarPowerPointDesdeApi() async {
+    if (_pptxGenerandoDesdeApi) return;
+    final empresa = clientController.Client['mipyme'];
+    final idEmpresa = int.tryParse((empresa is Map ? empresa['id_mipyme'] : null)?.toString() ?? '');
+    if (idEmpresa == null || idEmpresa <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona una empresa válida.')),
+      );
+      return;
+    }
+    final nombre = (empresa is Map ? empresa['nombre_mipyme'] : null)?.toString() ?? 'Empresa';
+    setState(() {
+      _pptxGenerandoDesdeApi = true;
+      _pptxEstadoApi = 'Solicitando presentación...';
+    });
+    try {
+      final paginas = await FvePresentacionBackendApi.descargar(
+        idMipyme: idEmpresa,
+        nombreEmpresa: nombre,
+        onProgreso: (etapa) {
+          if (mounted) setState(() => _pptxEstadoApi = etapa);
+        },
+      );
+      if (!mounted || paginas == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('PowerPoint descargado ($paginas diapositivas).')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo descargar PowerPoint: $e')),
+      );
+    } finally {
+      if (mounted) setState(() {
+        _pptxGenerandoDesdeApi = false;
+        _pptxEstadoApi = '';
+      });
+    }
   }
 
   void _toggleHeader() {
@@ -489,6 +535,22 @@ class _DashboardclientasesorState extends State<Dashboardclientasesor> {
               ),
             ),
           ),
+          // FVE_PPTX_BACKEND_V1: generación fuera de Flutter.
+          const SizedBox(width: 8),
+          Tooltip(
+            message: _pptxGenerandoDesdeApi ? _pptxEstadoApi : 'Descargar el informe PowerPoint de esta empresa',
+            child: OutlinedButton.icon(
+              onPressed: _pptxGenerandoDesdeApi ? null : _exportarPowerPointDesdeApi,
+              icon: _pptxGenerandoDesdeApi
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.slideshow_outlined, size: 19),
+              label: Text(MediaQuery.of(context).size.width > 850
+                  ? (_pptxGenerandoDesdeApi ? 'Preparando PPTX...' : 'Exportar PowerPoint')
+                  : 'PPTX'),
+            ),
+          ),
+
         ],
       ),
     );

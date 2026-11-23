@@ -7,7 +7,6 @@ import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/models/api/activoApi.dart';
 import 'package:finanzas_verdes/models/api/fveInventarioApi.dart';
 import 'package:finanzas_verdes/views/asesor/client/activo/fichaTecnicaVerdeActivo.dart';
-import 'package:finanzas_verdes/views/asesor/client/activo/perfilUsoActivo.dart';
 import 'package:finanzas_verdes/models/api/clientApi.dart';
 import 'package:finanzas_verdes/models/api/rolApi.dart';
 import 'package:finanzas_verdes/models/api/userApi.dart';
@@ -134,12 +133,6 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
                         ),
                         const SizedBox(height: 12),
 
-                        PerfilUsoActivo(
-                          tipo: tipoSeleccionado,
-                          horarioEmpresa: Get.find<ClientController>().Client['mipyme']?['horario_operacion'],
-                          onChanged: (v) => _perfilUso = v,
-                        ),
-                        const SizedBox(height: 12),
                         _input(marcaCtrl, "Marca", Icons.branding_watermark),
                         const SizedBox(height: 12),
 
@@ -150,6 +143,9 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
                           idActivo: null,
                           tipo: tipoSeleccionado,
                           nombre: nombreCtrl.text,
+                          perfilUsoInicial: _perfilUso,
+                          horarioEmpresa: Get.find<ClientController>().Client['mipyme']?['horario_operacion'],
+                          onPerfilUsoChanged: (v) => _perfilUso = v,
                           onChanged: (datos) { _datosTecnicosFve = datos; },
                         ),
                         const SizedBox(height: 12),
@@ -193,11 +189,6 @@ class _NewactivoasesorState extends State<Newactivoasesor> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_perfilUso == null) {
-      Get.snackbar('Uso del activo', 'Indica qué sucede con este equipo fuera del horario laboral.');
-      return;
-    }
-
     setState(() => loading = true);
 
     try {

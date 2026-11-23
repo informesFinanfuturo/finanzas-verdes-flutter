@@ -4,7 +4,6 @@ import 'package:finanzas_verdes/main.dart';
 import 'package:finanzas_verdes/models/api/activoApi.dart';
 import 'package:finanzas_verdes/models/api/fveInventarioApi.dart';
 import 'package:finanzas_verdes/views/asesor/client/activo/fichaTecnicaVerdeActivo.dart';
-import 'package:finanzas_verdes/views/asesor/client/activo/perfilUsoActivo.dart';
 import 'package:finanzas_verdes/models/api/clientApi.dart';
 import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/utils/WidgetsApp.dart';
@@ -612,15 +611,6 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
             ),
           ),
 
-          PerfilUsoActivo(
-            tipo: tipoSeleccionado ?? 'Otro',
-            inicial: _perfilUso,
-            horarioEmpresa: clientController.Client['mipyme']?['horario_operacion'],
-            onChanged: (v) {
-              _perfilUso = v;
-              _markAsChanged();
-            },
-          ),
           const SizedBox(height: 16),
           FichaTecnicaVerdeActivo(
             key: ValueKey("fve_ia_${_revisionFveIA}"),
@@ -628,6 +618,12 @@ class _EditactivoasesorState extends State<Editactivoasesor> {
             idActivo: int.tryParse('${clientController.Activo['id_activo'] ?? ''}'),
             tipo: tipoSeleccionado ?? '',
             nombre: nombreCtrl.text,
+            perfilUsoInicial: _perfilUso,
+            horarioEmpresa: clientController.Client['mipyme']?['horario_operacion'],
+            onPerfilUsoChanged: (v) {
+              _perfilUso = v;
+              _markAsChanged();
+            },
             onChanged: (datos) {
               // null indica reinicializacion por cambio de id/tipo;
               // no representa una edicion del asesor.
