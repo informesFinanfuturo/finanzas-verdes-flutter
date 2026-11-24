@@ -2,6 +2,7 @@ import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/models/api/fveInventarioApi.dart';
 import 'package:finanzas_verdes/views/asesor/client/activo/campoTecnicoVerde.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 /// Consulta del inventario. Los datos tecnicos se editan una sola vez en Activos.
 class InventarioVerdePanel extends StatefulWidget {
@@ -166,7 +167,9 @@ class _InventarioVerdePanelState extends State<InventarioVerdePanel> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _buildInventario(context));
+
+  Widget _buildInventario(BuildContext context) {
     final completas = _activos.where((a) => a['caracterizacion'] != null &&
         (a['campos_pendientes'] as List<dynamic>? ?? []).isEmpty).length;
     final tema = Theme.of(context);

@@ -25,7 +25,7 @@ class _ProcesofveasesorState extends State<Procesofveasesor> {
   List<Map<String, dynamic>> disponibles = [];
 
   static const List<String> pasos = [
-    'Inicio', 'Confirmar activos', 'Propuesta', 'PDF', 'Decisión',
+    'Diagnóstico', 'Reemplazos', 'Propuesta', 'PDF', 'Decisión',
     'Financiación', 'Viabilidad', 'Cierre',
   ];
 
@@ -107,13 +107,6 @@ class _ProcesofveasesorState extends State<Procesofveasesor> {
     });
   }
 
-  void cambiarCantidad(int indice, int cambio) {
-    final actual = entero(lineas[indice]['cantidad']) ?? 1;
-    final nuevo = (actual + cambio).clamp(1, 10000);
-    if (actual == nuevo) return;
-    setState(() => lineas[indice] = {...lineas[indice], 'cantidad': nuevo});
-  }
-
   Future<void> agregarActivo() async {
     final usados = lineas.map((x) => entero(x['id_activo'])).toSet();
     final opciones = disponibles.where((x) => !usados.contains(entero(x['id_activo']))).toList();
@@ -169,6 +162,12 @@ class _ProcesofveasesorState extends State<Procesofveasesor> {
       ));
       return;
     }
+    if (confirmar && lineas.any((l) => entero(l['cantidad']) != 1)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Hay cantidades heredadas distintas de 1. Corrígelas explícitamente antes de confirmar.'),
+      ));
+      return;
+    }
     if (confirmar && lineas.any((l) => entero(l['id_item']) == null || l['disponible'] != true)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Selecciona productos disponibles para todos los activos.'),
@@ -185,7 +184,7 @@ class _ProcesofveasesorState extends State<Procesofveasesor> {
       await cargar();
       if (mounted && error == null) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
-          confirmar ? 'Selección confirmada. Paso 3: propuesta comercial.' : 'Cambios guardados.',
+          confirmar ? 'Reemplazos confirmados. Paso 3: propuesta comercial.' : 'Cambios guardados.',
         )));
       }
     } catch (e) {
@@ -259,70 +258,161 @@ class _ProcesofveasesorState extends State<Procesofveasesor> {
 
   Widget fila(int indice, bool editable) {
     final l = lineas[indice];
-    final existe = entero(l['id_item']) != null;
-    final disponible = l['disponible'] == true;
-    final origen = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(texto(l['activo_nombre'], 'Activo'),
-        style: TextStyle(color: Global.text, fontWeight: FontWeight.w600)),
-      Text('Equipo actual', style: TextStyle(color: Global.textSecondary, fontSize: 11)),
-    ]);
-    final destino = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(existe ? texto(l['nombre_producto'], 'Producto #${l['id_item']}') : 'Seleccionar tecnología',
-        style: TextStyle(color: Global.text, fontWeight: FontWeight.w600)),
-      Text(existe
-          ? '${texto(l['nombre_proveedor'], 'Proveedor sin identificar')} · ${precio(l['precio_base'])}${disponible ? '' : ' · No disponible'}'
-          : 'Producto no registrado en el diagnóstico',
-        maxLines: 2, overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: Global.textSecondary, fontSize: 11)),
-    ]);
-    final acciones = <Widget>[
-      IconButton(onPressed: (entero(l['cantidad']) ?? 1) > 1 ? () => cambiarCantidad(indice, -1) : null,
-        tooltip: 'Disminuir cantidad', visualDensity: VisualDensity.compact,
-        icon: const Icon(Icons.remove_circle_outline, size: 18)),
-      Text('${l['cantidad'] ?? 1}', style: TextStyle(color: Global.text)),
-      IconButton(onPressed: () => cambiarCantidad(indice, 1),
-        tooltip: 'Aumentar cantidad', visualDensity: VisualDensity.compact,
-        icon: const Icon(Icons.add_circle_outline, size: 18)),
-      TextButton(onPressed: guardando ? null : () => cambiarProducto(indice),
-        child: Text(existe ? 'Cambiar' : 'Elegir')),
-      if (lineas.length > 1)
-        IconButton(onPressed: guardando ? null : () => setState(() => lineas.removeAt(indice)),
-          tooltip: 'Retirar de la negociación', icon: const Icon(Icons.close, size: 17)),
-    ];
-    return LayoutBuilder(builder: (context, limites) {
-      final compacto = limites.maxWidth < 900;
-      final comparacion = Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Icon(Icons.inventory_2_outlined, color: Global.primary, size: 20),
-        const SizedBox(width: 10),
-        Expanded(flex: 4, child: origen),
-        Icon(Icons.arrow_forward, size: 15, color: Global.textSecondary),
-        const SizedBox(width: 10),
-        Expanded(flex: 5, child: destino),
-        if (!editable) ...[
-          const SizedBox(width: 12),
-          Text('Cant. ${l['cantidad'] ?? 1}',
-            style: TextStyle(color: Global.textSecondary, fontSize: 12)),
-        ],
-      ]);
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        child: compacto
-          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              comparacion,
-              if (editable) Align(alignment: Alignment.centerRight,
-                child: Wrap(crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 1, children: acciones)),
-            ])
-          : Row(children: [
-              Expanded(child: comparacion),
-              if (editable) ...acciones,
-            ]),
+    final idItem = entero(l['id_item']);
+    final existe = idItem != null;
+    final disponible = existe && l['disponible'] == true;
+    final unidades = entero(l['cantidad']) ?? 0;
+    final oscuro = controller.isDark.value;
+    final verde = oscuro ? const Color(0xFF8DDDB1) : const Color(0xFF166341);
+    final fondoNuevo = oscuro ? const Color(0xFF173A30) : const Color(0xFFEDF8F0);
+    final bordeNuevo = oscuro ? const Color(0xFF3F9672) : const Color(0xFF9BD2AF);
+    final fondoActual = oscuro ? const Color(0xFF2A333A) : const Color(0xFFF4F6F8);
+    final fondoAviso = oscuro ? const Color(0xFF4A3620) : const Color(0xFFFFF5E4);
+    final colorAviso = oscuro ? const Color(0xFFFFDA9C) : const Color(0xFF8B5519);
+
+    Widget panel({required String titulo, required String nombre,
+      required bool destino, required Widget detalle}) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: destino ? fondoNuevo : fondoActual,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: destino ? bordeNuevo : Global.textSecondary.withOpacity(.17),
+            width: destino ? 1.5 : 1),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(titulo, style: TextStyle(
+            color: destino ? verde : Global.textSecondary,
+            fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .7)),
+          const SizedBox(height: 12),
+          Text(nombre, style: TextStyle(color: destino ? (oscuro ? Colors.white : const Color(0xFF143B29)) : Global.text,
+            fontSize: 16, fontWeight: FontWeight.w700, height: 1.25)),
+          const SizedBox(height: 10),
+          detalle,
+        ]),
       );
-    });
+    }
+
+    final origen = panel(
+      titulo: 'EQUIPO ACTUAL DEL DIAGNÓSTICO',
+      nombre: texto(l['activo_nombre'], 'Activo sin nombre'),
+      destino: false,
+      detalle: const SizedBox.shrink(),
+    );
+    final destino = panel(
+      titulo: 'TECNOLOGÍA VERDE',
+      nombre: existe ? texto(l['nombre_producto'], 'Producto #$idItem') : 'Aún no se eligió un producto',
+      destino: true,
+      detalle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (existe) ...[
+          Text('Proveedor: ${texto(l['nombre_proveedor'], 'No identificado')}',
+            style: TextStyle(fontSize: 12, color: Global.text)),
+          const SizedBox(height: 3),
+          Text('Precio del catálogo: ${precio(l['precio_base'])}',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: verde)),
+          if (!disponible) ...[
+            const SizedBox(height: 10),
+            Text('No disponible: elige otra alternativa.',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorAviso)),
+          ],
+        ] else Text('Selecciona una alternativa del catálogo para este reemplazo.',
+          style: TextStyle(fontSize: 12, color: Global.textSecondary)),
+      ]),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Global.container,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Global.textSecondary.withOpacity(.22)),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            Text('REEMPLAZO PROPUESTO ${indice + 1} DE ${lineas.length}',
+              style: TextStyle(color: Global.text, fontSize: 13,
+                fontWeight: FontWeight.w800, letterSpacing: .3)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(color: disponible ? fondoNuevo : fondoAviso, borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: disponible ? bordeNuevo : colorAviso.withOpacity(.4))),
+              child: Text(!existe ? 'Tecnología sin elegir' :
+                (disponible ? 'Lista para la propuesta' : 'Producto no disponible'),
+                style: TextStyle(color: disponible ? verde : colorAviso,
+                  fontSize: 11, fontWeight: FontWeight.w700)),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          LayoutBuilder(builder: (context, limites) {
+            if (limites.maxWidth < 650) {
+              return Column(children: [
+                origen,
+                Padding(padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Icon(Icons.arrow_downward_rounded, size: 23, color: verde)),
+                destino,
+              ]);
+            }
+            return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              Expanded(child: origen),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Icon(Icons.arrow_forward_rounded, size: 27, color: verde)),
+              Expanded(child: destino),
+            ]);
+          }),
+          if (unidades != 1) ...[
+            const SizedBox(height: 12),
+            Container(width: double.infinity, padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: fondoAviso,
+                border: Border.all(color: colorAviso.withOpacity(.5)),
+                borderRadius: BorderRadius.circular(10)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Revisar cantidad heredada: $unidades',
+                  style: TextStyle(fontWeight: FontWeight.w800, color: colorAviso)),
+                const SizedBox(height: 5),
+                Text('El ahorro se evalúa por activo, pero esta selección tiene varias unidades. Para evitar métricas inconsistentes, confirma un único reemplazo por activo. No se modificará el dato hasta guardar.',
+                  style: TextStyle(fontSize: 12, color: colorAviso)),
+                if (editable)
+                  TextButton.icon(
+                    onPressed: guardando ? null : () => setState(() {
+                      lineas[indice] = {...lineas[indice], 'cantidad': 1};
+                    }),
+                    icon: const Icon(Icons.rule, size: 17),
+                    label: const Text('Corregir a 1 reemplazo'),
+                  ),
+              ]),
+            ),
+          ],
+          if (editable) ...[
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              FilledButton.tonalIcon(
+                onPressed: guardando ? null : () => cambiarProducto(indice),
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: Text(existe ? 'Cambiar tecnología' : 'Seleccionar tecnología'),
+              ),
+              if (lineas.length > 1)
+                TextButton.icon(
+                  onPressed: guardando ? null : () => setState(() => lineas.removeAt(indice)),
+                  icon: const Icon(Icons.remove_circle_outline, size: 17),
+                  label: const Text('Quitar de la negociación'),
+                ),
+            ]),
+          ],
+        ]),
+      ),
+    );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => ColoredBox(
+    color: Global.bg,
+    child: _buildVista(context),
+  ));
+
+  Widget _buildVista(BuildContext context) {
     final p = mapa(cliente.ProcesoFve);
     final paso = pasoVisible(p);
     final empresa = texto(p['nombre_mipyme'], texto(mapa(cliente.Client['mipyme'])['nombre_mipyme'], 'Cliente'));
@@ -381,25 +471,51 @@ class _ProcesofveasesorState extends State<Procesofveasesor> {
                 style: const TextStyle(color: Colors.red))),
             if (cargando && lineas.isEmpty) const LinearProgressIndicator(),
             if (error == null) ...[
-              Text(esConfirmacion ? 'Confirmar selección del diagnóstico' : 'Selección confirmada',
-                style: TextStyle(color: Global.text, fontWeight: FontWeight.w600)),
+              if (paso == 1)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: Text('Este paso corresponde al diagnóstico que dio origen a la negociación. Puedes consultarlo en Ver diagnóstico.'),
+                ),
+              Text(paso == 1 ? 'Diagnóstico de origen' : esConfirmacion ? 'Confirma los reemplazos propuestos' : 'Selección confirmada',
+                style: TextStyle(color: Global.text, fontWeight: FontWeight.w800, fontSize: 17)),
+              if (esConfirmacion) ...[
+                const SizedBox(height: 7),
+                Text('Cada equipo del diagnóstico se vincula con una tecnología propuesta. Revisa ambos lados del cambio antes de generar la propuesta comercial.',
+                  style: TextStyle(color: Global.textSecondary, fontSize: 13, height: 1.3)),
+                const SizedBox(height: 12),
+                Container(width: double.infinity, padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Global.primary.withOpacity(.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Global.primary.withOpacity(.28))),
+                  child: Wrap(spacing: 14, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('${lineas.length} activo(s) a revisar',
+                        style: TextStyle(color: Global.text, fontWeight: FontWeight.w700)),
+                      Text('${lineas.where((l) => entero(l['id_item']) != null && l['disponible'] == true).length} alternativa(s) disponibles',
+                        style: TextStyle(color: Global.textSecondary)),
+                    ])),
+                const SizedBox(height: 9),
+                Text('Un reemplazo por activo. La cantidad no se elige aquí: una cantidad libre puede distorsionar la inversión frente al ahorro estimado.',
+                  style: TextStyle(color: Global.textSecondary, fontSize: 12)),
+              ],
               if (lineas.isEmpty)
                 Padding(padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Text('Este diagnóstico aún no tiene una selección guardada para FVE. Vuelve al diagnóstico, elige los productos y pulsa "Guardar selección para FVE".',
                     style: TextStyle(color: Global.textSecondary))),
-              for (int i = 0; i < lineas.length; i++) ...[
-                fila(i, esConfirmacion),
-                if (i < lineas.length - 1) Divider(color: Global.textSecondary.withOpacity(.13)),
-              ],
+              for (int i = 0; i < lineas.length; i++) fila(i, esConfirmacion),
               if (esConfirmacion) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 14),
                 Wrap(spacing: 10, runSpacing: 8, children: [
                   OutlinedButton.icon(onPressed: guardando ? null : agregarActivo,
-                    icon: const Icon(Icons.add, size: 17), label: const Text('Añadir activo')),
+                    icon: const Icon(Icons.add, size: 17), label: const Text('Añadir otro activo del diagnóstico')),
                   OutlinedButton(onPressed: guardando ? null : () => guardar(confirmar: false),
                     child: const Text('Guardar cambios')),
-                  FilledButton.icon(onPressed: guardando ? null : () => guardar(confirmar: true),
-                    icon: const Icon(Icons.check, size: 17), label: const Text('Confirmar y continuar')),
+                  FilledButton.icon(
+                    onPressed: guardando || lineas.isEmpty || lineas.any((l) =>
+                      entero(l['id_item']) == null || l['disponible'] != true || entero(l['cantidad']) != 1)
+                      ? null : () => guardar(confirmar: true),
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: const Text('Confirmar reemplazos y continuar')),
                 ]),
               ] else if (paso == 3) ...[
                 const SizedBox(height: 10),

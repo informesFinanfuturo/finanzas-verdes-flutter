@@ -2,7 +2,11 @@ import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/models/api/fveApi.dart';
 import 'package:finanzas_verdes/models/api/fveNegociacionApi.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 class NegociacionIntegralPanel extends StatefulWidget {
@@ -16,12 +20,19 @@ class NegociacionIntegralPanel extends StatefulWidget {
 }
 
 class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
-  static const etiquetas=['Inicio','Confirmar activos','Propuesta','PDF','Decisión','Financiación','Viabilidad','Cierre'];
+  static const etiquetas=['Diagnóstico','Reemplazos','Propuesta','Revisar y emitir','Decisión','Financiación','Viabilidad','Cierre'];
   Map<String,dynamic> info={};
   List<Map<String,dynamic>> seleccion=[];
   bool cargando=true, trabajando=false;
   String? error;
-  String decision='interesado',modalidad='recursos_propios',credito='no_aplica';
+  Uint8List? vistaPreviaBytes;
+  int? vistaPreviaId;
+  bool cargandoVistaPrevia=false;
+  String? errorVistaPrevia;
+  String? decisionElegida;
+  String? errorDecision;
+  final TextEditingController motivoDecision = TextEditingController();
+  String modalidad='recursos_propios',credito='no_aplica';
   bool propiosConfirmados=false;
   final TextEditingController observacion=TextEditingController();
   final TextEditingController propios=TextEditingController(text:'0');
@@ -40,12 +51,18 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
   @override void initState(){super.initState();WidgetsBinding.instance.addPostFrameCallback((_)=>_cargar());}
   @override void didUpdateWidget(covariant NegociacionIntegralPanel old){
     super.didUpdateWidget(old);
+    if(old.proceso['id_proceso']!=widget.proceso['id_proceso'] ||
+      (old.proceso['paso_actual']!=widget.proceso['paso_actual'] && paso==5)) {
+      decisionElegida=null;
+      errorDecision=null;
+      motivoDecision.clear();
+    }
     if(old.proceso['paso_actual']!=widget.proceso['paso_actual']||
        old.proceso['id_proceso']!=widget.proceso['id_proceso']) {
       WidgetsBinding.instance.addPostFrameCallback((_)=>_cargar());
     }
   }
-  @override void dispose(){observacion.dispose();propios.dispose();solicitado.dispose();aprobado.dispose();soporte.dispose();super.dispose();}
+  @override void dispose(){motivoDecision.dispose();observacion.dispose();propios.dispose();solicitado.dispose();aprobado.dispose();soporte.dispose();super.dispose();}
   Future<void> _cargar() async {
     if(!mounted || idProceso<=0)return;
     setState((){cargando=true;error=null;});
@@ -54,6 +71,17 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
       final a=await obtenerSeleccionFveApi(idProceso:idProceso);
       if(!mounted)return;
       setState((){info=r;seleccion=_lista(a['lineas']);});
+      if (paso == 4) {
+        final propuestas = _lista(r['propuestas']);
+        if (propuestas.isNotEmpty && propuestas.first['estado']=='borrador') {
+          final borrar = propuestas.first;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _actualizarVistaPrevia(borrar);
+          });
+        }
+      } else if (vistaPreviaBytes != null || errorVistaPrevia != null) {
+        setState(() { vistaPreviaBytes=null; vistaPreviaId=null; errorVistaPrevia=null; });
+      }
       if(paso==6 && propios.text=='0' && solicitado.text=='0') {
         final props=_lista(r['propuestas']);
         if(props.isNotEmpty) propios.text='${_numero(props.first['total_inversion'])}';
@@ -91,6 +119,87 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
     }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}
     finally{if(mounted)setState(()=>trabajando=false);}
   }
+  Future<void> _actualizarVistaPrevia(Map<String,dynamic> propuesta) async {
+    if (cargandoVistaPrevia || !mounted || paso!=4) return;
+    final id=_numero(propuesta['id_propuesta']);
+    if (id<=0) return;
+    setState(() { cargandoVistaPrevia=true; errorVistaPrevia=null; vistaPreviaBytes=null; vistaPreviaId=id; });
+    try {
+      final bytes=await FveNegociacionApi.vistaPreviaPdf(idProceso,id);
+      if (!mounted || paso!=4 || vistaPreviaId!=id) return;
+      setState(() => vistaPreviaBytes=bytes);
+    } catch(e) {
+      if (mounted && paso==4 && vistaPreviaId==id) {
+        setState(() => errorVistaPrevia=e.toString());
+      }
+    } finally {
+      if (mounted) setState(() => cargandoVistaPrevia=false);
+    }
+  }
+  Future<void> _confirmarPresentacion() async {
+    if (trabajando || cargandoVistaPrevia || vistaPreviaBytes==null) return;
+    final aceptar=await showDialog<bool>(
+      context:context,
+      builder:(ctx)=>AlertDialog(
+        title:const Text('Emitir propuesta definitiva'),
+        content:const Text('Esta versi\u00f3n se registrar\u00e1 como presentada y no podr\u00e1 editarse. Revisa el PDF antes de continuar.'),
+        actions:[
+          TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancelar')),
+          FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Presentar propuesta')),
+        ],
+      ),
+    );
+    if (aceptar==true && mounted) await _accion('/presentar');
+  }
+  Future<void> _registrarDecision() async {
+    if(trabajando || cargando || !mounted || paso!=5) return;
+    final elegida=decisionElegida;
+    if(elegida==null || !['interesado','suspendido','desinteresado'].contains(elegida)) return;
+    final motivo=motivoDecision.text.trim();
+    if(elegida!='interesado' && motivo.isEmpty){
+      setState(()=>errorDecision='Registra el motivo que expresó el cliente antes de continuar.');
+      return;
+    }
+    if(motivo.length>1500){
+      setState(()=>errorDecision='La observación no puede superar 1.500 caracteres.');
+      return;
+    }
+    setState(()=>errorDecision=null);
+    final nombre=elegida=='interesado' ? 'continuar' : elegida=='suspendido' ? 'esperar' : 'no continuar';
+    final consecuencia=elegida=='interesado'
+      ? 'Al registrar esta respuesta se avanzará al paso 6.'
+      : elegida=='suspendido'
+        ? 'La negociación quedará suspendida y podrá reanudarse.'
+        : 'Se registrará el desistimiento de esta propuesta y el proceso pasará al cierre.';
+    final confirmado=await showDialog<bool>(
+      context:context,
+      builder:(ctx)=>AlertDialog(
+        title:const Text('Confirmar decisión del cliente'),
+        content:Text('El cliente decidió $nombre.\n\n$consecuencia\n\n¿Confirmas que esta fue su respuesta?'),
+        actions:[
+          TextButton(onPressed:()=>Navigator.of(ctx).pop(false),child:const Text('Volver')),
+          FilledButton(onPressed:()=>Navigator.of(ctx).pop(true),child:const Text('Confirmar y registrar')),
+        ],
+      ),
+    );
+    if(confirmado!=true || !mounted || paso!=5) return;
+    await _accion('/decision',{'decision':elegida,'observacion':motivo});
+  }
+
+  Future<void> _reanudarDecision() async {
+    if(trabajando || !mounted || paso!=5)return;
+    await _accion('/reanudar');
+    if(!mounted)return;
+    final eventos=_lista(info['historial']);
+    if(eventos.isNotEmpty && eventos.first['accion']=='NEGOCIACION_REANUDADA'){
+      setState((){
+        decisionElegida=null;
+        errorDecision=null;
+        motivoDecision.clear();
+      });
+    }
+  }
+
   Future<void> _descargar(Map<String,dynamic> prop) async{
     if(trabajando)return;
     setState(()=>trabajando=true);
@@ -168,12 +277,170 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
   Widget _contenido(){
     final prop=ultima,actual=presentada;
     if(paso==3){
+      final items = seleccion;
+      num totalEstimado = 0;
+      int equiposConProducto = 0;
+      int pendientesSeleccion = 0;
+      int elegibles = 0;
+      int pendientesElegibilidad = 0;
+      final beneficios = <Map<String,String>>[];
+
+      for(final l in items){
+        final cantidad = _numero(l['cantidad']) <= 0 ? 1 : _numero(l['cantidad']);
+        final precioBase = num.tryParse('${l['precio_base']}') ?? num.tryParse('${l['precio_unitario']}') ?? 0;
+        final subtotal = num.tryParse('${l['subtotal']}');
+        totalEstimado += subtotal != null && subtotal > 0 ? subtotal : precioBase * cantidad;
+        if(l['id_item'] != null){
+          equiposConProducto++;
+        }else{
+          pendientesSeleccion++;
+        }
+        final ahorro = num.tryParse(_texto(l['ahorro_estimado_anual']));
+        final unidad = _texto(l['unidad_ahorro']);
+        final estado = _texto(l['estado_ambiental']).toLowerCase();
+        if(estado == 'elegible' && ahorro != null && ahorro.isFinite && ahorro > 0 && unidad.isNotEmpty){
+          beneficios.add({
+            'titulo': _texto(l['activo_nombre'],'Activo'),
+            'valor': '$ahorro $unidad',
+          });
+        }
+        if(estado == 'elegible'){
+          elegibles++;
+        }else if(estado.isEmpty || estado == 'pendiente' || estado == 'pendiente_dato'){
+          pendientesElegibilidad++;
+        }
+      }
+
+      Widget indicador(String titulo, String valor, {String? detalle, bool compacto=false}) {
+        return Container(
+          width: 220,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Global.container,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Global.textSecondary.withOpacity(.18)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(titulo, style: TextStyle(color: Global.textSecondary, fontSize: 12, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text(valor, style: TextStyle(color: Global.text, fontSize: compacto ? 18 : 24, fontWeight: FontWeight.w800)),
+            if (detalle != null && detalle.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(detalle, style: TextStyle(color: Global.textSecondary, fontSize: 12, height: 1.25)),
+            ]
+          ]),
+        );
+      }
+
+      Widget bloque(String titulo, List<Widget> children) {
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(top: 14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Global.container,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Global.textSecondary.withOpacity(.18)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(titulo, style: TextStyle(color: Global.text, fontSize: 16, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 12),
+            ...children,
+          ]),
+        );
+      }
+
+      Widget resumenIntervencion(Map<String,dynamic> l) {
+        final cantidad = _numero(l['cantidad']) <= 0 ? 1 : _numero(l['cantidad']);
+        final precioBase = num.tryParse('${l['precio_base']}') ?? num.tryParse('${l['precio_unitario']}') ?? 0;
+        final subtotal = num.tryParse('${l['subtotal']}');
+        final valor = subtotal != null && subtotal > 0 ? subtotal : precioBase * cantidad;
+        final tieneProducto = l['id_item'] != null;
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Global.bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Global.textSecondary.withOpacity(.14)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_texto(l['activo_nombre'],'Activo del diagnóstico'),
+              style: TextStyle(color: Global.text, fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(tieneProducto ? _texto(l['nombre_producto'],'Producto seleccionado') : 'Sin tecnología seleccionada',
+              style: TextStyle(color: Global.textSecondary, fontSize: 13, height: 1.3)),
+            const SizedBox(height: 10),
+            Wrap(spacing: 16, runSpacing: 8, children: [
+              Text('Proveedor: ${_texto(l['nombre_proveedor'],'Pendiente')}',
+                style: TextStyle(color: Global.textSecondary, fontSize: 12)),
+              Text('Cantidad: $cantidad', style: TextStyle(color: Global.textSecondary, fontSize: 12)),
+              Text('Inversión estimada: ${pesos(valor)}',
+                style: TextStyle(color: Global.text, fontSize: 12, fontWeight: FontWeight.w700)),
+            ]),
+          ]),
+        );
+      }
+
       return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        const Text('Productos confirmados',style:TextStyle(fontWeight:FontWeight.w600)),
-        for(final l in seleccion)_producto(l,listaOriginal:true),
-        const Divider(),
-        const Text('La propuesta tomará el precio vigente del catálogo. Los ahorros no verificados permanecerán pendientes.',
-          style:TextStyle(fontSize:12)),
+        Text('Propuesta de inversión verde', style: TextStyle(color: Global.text, fontSize: 20, fontWeight: FontWeight.w800)),
+        const SizedBox(height:6),
+        Text('Aquí se consolida la inversión estimada y la justificación básica de la intervención antes de generar el borrador en PDF.',
+          style: TextStyle(color: Global.textSecondary, fontSize: 13, height: 1.35)),
+        const SizedBox(height:14),
+        Wrap(spacing:12, runSpacing:12, children:[
+          indicador('Inversión estimada', pesos(totalEstimado), detalle:'Suma de los productos seleccionados con precio vigente de catálogo.'),
+          indicador('Equipos por intervenir', '$equiposConProducto', detalle: pendientesSeleccion > 0 ? '$pendientesSeleccion pendiente(s) de selección.' : 'Todos los equipos tienen tecnología propuesta.'),
+          indicador('Beneficio ambiental',
+            beneficios.isEmpty ? 'Sin cálculo disponible' :
+              (beneficios.length == 1 ? beneficios.first['valor']! : '${beneficios.length} ahorros estimados'),
+            detalle: beneficios.isEmpty
+              ? 'No hay datos de ahorro en la selección recibida. No significa que el beneficio sea cero.'
+              : (beneficios.length == 1
+                ? 'Estimación registrada para un activo; consultar su soporte técnico.'
+                : 'Consulta cada activo: no se suman ahorros con unidades diferentes.'),
+            compacto: true),
+        ]),
+        bloque('Resumen de las intervenciones',[
+          if(items.isEmpty)
+            Text('Todavía no hay productos confirmados para esta propuesta.', style: TextStyle(color: Global.textSecondary))
+          else
+            for(final l in items) resumenIntervencion(l),
+        ]),
+        bloque('Impacto ambiental esperado',[
+          if(beneficios.isEmpty)
+            Text('Aún no hay ahorros técnicos consolidados para mostrar en este paso. El borrador mantendrá estos datos como pendientes cuando no exista soporte.',
+              style: TextStyle(color: Global.textSecondary, fontSize: 13, height: 1.35))
+          else ...[
+            for(final b in beneficios)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: Text(b['titulo']!, style: TextStyle(color: Global.text, fontWeight: FontWeight.w600))),
+                  const SizedBox(width: 12),
+                  Text(b['valor']!, style: TextStyle(color: Global.primary, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            elegibles > 0 || pendientesElegibilidad > 0
+              ? 'Elegibilidad ambiental: $elegibles registrada(s) como elegible(s) y $pendientesElegibilidad pendiente(s) de validar.'
+              : 'La elegibilidad ambiental se mostrará aquí cuando exista información registrada para las tecnologías seleccionadas.',
+            style: TextStyle(color: Global.textSecondary, fontSize: 12, height: 1.3),
+          ),
+        ]),
+        bloque('Justificación y condiciones',[
+          Text('• La propuesta se arma con los equipos seleccionados en el diagnóstico y con los precios vigentes del catálogo.',
+            style: TextStyle(color: Global.textSecondary, fontSize: 13, height: 1.35)),
+          const SizedBox(height: 6),
+          Text('• Los beneficios ambientales y de ahorro solo se muestran cuando existe un dato técnico registrado en el proceso.',
+            style: TextStyle(color: Global.textSecondary, fontSize: 13, height: 1.35)),
+          const SizedBox(height: 6),
+          Text('• El paso siguiente genera un borrador que servirá como base del documento formal en PDF.',
+            style: TextStyle(color: Global.textSecondary, fontSize: 13, height: 1.35)),
+        ]),
         const SizedBox(height:12),
         _campo(observacion,'Observación (opcional)'),const SizedBox(height:10),
         Wrap(spacing:10,runSpacing:8,children:[
@@ -182,38 +449,211 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
         ])
       ]);
     }
+
     if(paso==4){
       final d=_mapa(prop?['detalle']);
+      final bytes=vistaPreviaBytes;
+      final tieneBorrador=prop != null && prop['estado']=='borrador';
       return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text('Borrador V${prop?['numero_version'] ?? '-'} · ${pesos(d['total_inversion'])}',
-          style:TextStyle(color:Global.text,fontSize:16,fontWeight:FontWeight.w600)),
-        for(final l in _lista(d['lineas']))_producto(l),
-        const Text('Revisa precios y elegibilidad. Al presentar se genera un PDF inmutable.',style:TextStyle(fontSize:12)),
-        const SizedBox(height:12),
-        Wrap(spacing:10,runSpacing:8,children:[
-          _boton('Actualizar borrador',()=>_accion('/propuesta',{'observacion':observacion.text}),principal:false),
-          _boton('Presentar y generar PDF',()=>_accion('/presentar')),
+        Text('Revisar y emitir propuesta',
+          style:TextStyle(color:Global.text,fontSize:21,fontWeight:FontWeight.w800)),
+        const SizedBox(height:7),
+        Text(_texto(d['nombre_mipyme'],_texto(widget.proceso['nombre_mipyme'],'Empresa')),
+          style:TextStyle(color:Global.text,fontSize:14)),
+        const SizedBox(height:14),
+        if(cargandoVistaPrevia) ...[
+          const LinearProgressIndicator(),
+          const SizedBox(height:10),
+          Text('Preparando el PDF real para revisi\u00f3n...',
+            style:TextStyle(color:Global.textSecondary)),
+        ] else if(errorVistaPrevia!=null) ...[
+          Text(errorVistaPrevia!,style:const TextStyle(color:Colors.red)),
+          const SizedBox(height:8),
+          if(tieneBorrador) _boton('Reintentar vista previa',()=>_actualizarVistaPrevia(prop!),principal:false),
+        ] else if(bytes!=null && vistaPreviaId==_numero(prop?['id_propuesta'])) ...[
+          SizedBox(
+            height:(MediaQuery.sizeOf(context).height*0.74).clamp(520.0,860.0).toDouble(),
+            child:PdfPreview(
+              key:ValueKey('fve-vista-previa-${vistaPreviaId}'),
+              build:(formato) async => bytes,
+              initialPageFormat:PdfPageFormat.a4,
+              canChangePageFormat:false,
+              canChangeOrientation:false,
+              allowPrinting:false,
+              allowSharing:false,
+              canDebug:false,
+              maxPageWidth:800,
+              pdfFileName:'FVE_${idProceso}_V${prop?['numero_version']}_vista-previa.pdf',
+            ),
+          ),
+        ] else ...[
+          Text(tieneBorrador ? 'La vista previa se generar\u00e1 autom\u00e1ticamente.' :
+            'No hay un borrador disponible para revisar.',
+            style:TextStyle(color:Global.textSecondary)),
+        ],
+        const SizedBox(height:14),
+        Wrap(spacing:10,runSpacing:10,children:[
+          _boton('Volver a propuesta',tieneBorrador ? ()=>_accion('/volver-propuesta') : null,principal:false),
+          _boton('Actualizar vista previa',tieneBorrador && !cargandoVistaPrevia
+            ? ()=>_actualizarVistaPrevia(prop!) : null,principal:false),
+          _boton('Presentar y generar PDF definitivo',
+            tieneBorrador && !cargandoVistaPrevia && vistaPreviaBytes!=null
+              ? _confirmarPresentacion : null),
         ]),
+        const SizedBox(height:8),
+        Text('La vista previa no presenta ni modifica la propuesta. Al emitirla, la versi\u00f3n quedar\u00e1 registrada como inmutable.',
+          style:TextStyle(color:Global.textSecondary,fontSize:12)),
       ]);
     }
     if(paso==5){
-      final d=_lista(info['decisiones']);
+      final decisiones=_lista(info['decisiones']);
       final eventos=_lista(info['historial']);
       final reanudada=eventos.isNotEmpty && eventos.first['accion']=='NEGOCIACION_REANUDADA';
-      final suspendida=d.isNotEmpty&&d.first['decision']=='suspendido'&&!reanudada;
+      final suspendida=decisiones.isNotEmpty && decisiones.first['decision']=='suspendido' && !reanudada;
+      final seleccion=decisionElegida;
+      final requiereMotivo=seleccion=='suspendido' || seleccion=='desinteresado';
+      final explicacion=seleccion=='interesado'
+        ? 'Al registrar esta respuesta se avanzará al paso 6'
+        : seleccion=='suspendido'
+          ? 'La negociación permanecerá en este paso hasta que se reanude.'
+          : 'Se registrará el desistimiento y el proceso pasará al cierre.';
+
+      Widget opcion(String valor,String titulo,String descripcion){
+        final activo=seleccion==valor;
+        return InkWell(
+          onTap:trabajando?null:()=>setState((){
+            decisionElegida=valor;
+            errorDecision=null;
+          }),
+          borderRadius:BorderRadius.circular(12),
+          child:AnimatedContainer(
+            duration:const Duration(milliseconds:160),
+            constraints:const BoxConstraints(minHeight:104),
+            padding:const EdgeInsets.all(15),
+            decoration:BoxDecoration(
+              color:activo?Global.primary.withOpacity(.07):Global.container,
+              borderRadius:BorderRadius.circular(12),
+              border:Border.all(color:activo?Global.primary:Global.textSecondary.withOpacity(.23),width:activo?1.8:1),
+            ),
+            child:Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Icon(activo?Icons.radio_button_checked:Icons.radio_button_unchecked,
+                color:activo?Global.primary:Global.textSecondary,size:22),
+              const SizedBox(width:11),
+              Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                Text(titulo,style:TextStyle(color:Global.text,fontSize:14,fontWeight:FontWeight.w700)),
+                const SizedBox(height:6),
+                Text(descripcion,style:TextStyle(color:Global.textSecondary,fontSize:12.5,height:1.35)),
+              ])),
+            ]),
+          ),
+        );
+      }
+
       return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text('Propuesta presentada V${actual?['numero_version'] ?? '-'} · ${pesos(actual?['total_inversion'])}',
-          style:TextStyle(color:Global.text,fontWeight:FontWeight.w600)),
-        const SizedBox(height:10),
-        if(actual!=null)_boton('Guardar PDF',()=>_descargar(actual),principal:false),
+        Text('Decisión del cliente',style:TextStyle(color:Global.text,fontSize:20,fontWeight:FontWeight.w800)),
         const SizedBox(height:12),
+        Container(
+          width:double.infinity,
+          padding:const EdgeInsets.all(16),
+          decoration:BoxDecoration(
+            color:Global.bg,
+            borderRadius:BorderRadius.circular(12),
+            border:Border.all(color:Global.textSecondary.withOpacity(.18)),
+          ),
+          child:Wrap(spacing:28,runSpacing:13,crossAxisAlignment:WrapCrossAlignment.center,children:[
+            Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
+              Text('EMPRESA',style:TextStyle(color:Global.textSecondary,fontSize:10,fontWeight:FontWeight.w700,letterSpacing:.6)),
+              const SizedBox(height:5),
+              Text(_texto(widget.proceso['nombre_mipyme'],'Empresa'),
+                style:TextStyle(color:Global.text,fontSize:15,fontWeight:FontWeight.w700)),
+            ]),
+            Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
+              Text('PROPUESTA V${actual?['numero_version'] ?? '-'}',
+                style:TextStyle(color:Global.textSecondary,fontSize:10,fontWeight:FontWeight.w700,letterSpacing:.6)),
+              const SizedBox(height:5),
+              Text(pesos(actual?['total_inversion']),
+                style:TextStyle(color:Global.text,fontSize:19,fontWeight:FontWeight.w800)),
+            ]),
+            if(actual!=null)
+              OutlinedButton.icon(
+                onPressed:trabajando?null:()=>_descargar(actual),
+                icon:const Icon(Icons.picture_as_pdf_outlined,size:18),
+                label:const Text('Descargar PDF'),
+              ),
+          ]),
+        ),
+        const SizedBox(height:24),
         if(suspendida)...[
-          const Text('Negociación suspendida. Puedes retomarla y registrar una nueva decisión.'),
-          _boton('Reanudar',()=>_accion('/reanudar')),
-        ]else...[
-          _menu('Decisión del cliente',decision,['interesado','suspendido','desinteresado'],(x)=>setState(()=>decision=x??decision)),
-          const SizedBox(height:8),_campo(observacion,'Observaciones del cliente'),const SizedBox(height:8),
-          _boton('Registrar decisión',()=>_accion('/decision',{'decision':decision,'observacion':observacion.text})),
+          Text('La negociación está suspendida.',
+            style:TextStyle(color:Global.text,fontSize:16,fontWeight:FontWeight.w700)),
+          const SizedBox(height:7),
+          Text('Cuando el cliente tome una nueva decisión, reanuda el proceso para registrarla.',
+            style:TextStyle(color:Global.textSecondary,fontSize:13)),
+          const SizedBox(height:16),
+          _boton('Reanudar negociación',_reanudarDecision),
+        ] else ...[
+          Text('¿Qué decidió el cliente después de revisar la propuesta?',
+            style:TextStyle(color:Global.text,fontSize:17,fontWeight:FontWeight.w800,height:1.25)),
+          const SizedBox(height:7),
+          Text('Selecciona la respuesta manifestada por el cliente.',
+            style:TextStyle(color:Global.textSecondary,fontSize:13)),
+          const SizedBox(height:15),
+          LayoutBuilder(builder:(ctx,limites){
+            final alternativas=[
+              opcion('interesado','Desea continuar','Quiere avanzar hacia el análisis de financiación.'),
+              opcion('suspendido','Prefiere esperar','Necesita más tiempo antes de tomar una decisión.'),
+              opcion('desinteresado','No desea continuar','Decidió no seguir adelante con esta propuesta.'),
+            ];
+            if(limites.maxWidth>=850){
+              return Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                for(final tarjeta in alternativas)...[
+                  Expanded(child:tarjeta),
+                  if(tarjeta!=alternativas.last)const SizedBox(width:12),
+                ],
+              ]);
+            }
+            return Column(children:[
+              for(final tarjeta in alternativas)...[
+                SizedBox(width:double.infinity,child:tarjeta),
+                if(tarjeta!=alternativas.last)const SizedBox(height:10),
+              ],
+            ]);
+          }),
+          if(seleccion!=null)...[
+            const SizedBox(height:18),
+            if(seleccion!='interesado') ...[
+              Text('Al registrar esta respuesta',
+                style:TextStyle(color:Global.text,fontSize:13,fontWeight:FontWeight.w700)),
+              const SizedBox(height:5),
+            ],
+            Text(explicacion,style:TextStyle(color:Global.textSecondary,fontSize:13,height:1.35)),
+            const SizedBox(height:16),
+            TextField(
+              controller:motivoDecision,
+              maxLines:3,
+              maxLength:1500,
+              onChanged:(_){if(errorDecision!=null)setState(()=>errorDecision=null);},
+              decoration:InputDecoration(
+                labelText:requiereMotivo?'Motivo expresado por el cliente (obligatorio)':'Observaciones del cliente (opcional)',
+                alignLabelWithHint:true,
+                border:const OutlineInputBorder(),
+              ),
+            ),
+            if(errorDecision!=null)...[
+              const SizedBox(height:5),
+              Text(errorDecision!,style:const TextStyle(color:Colors.red,fontSize:12)),
+            ],
+            const SizedBox(height:9),
+            FilledButton(
+              onPressed:trabajando || actual==null ? null : _registrarDecision,
+              child:Text(seleccion=='interesado'?'Registrar interés y continuar':
+                seleccion=='suspendido'?'Registrar suspensión':'Confirmar desistimiento'),
+            ),
+          ]else...[
+            const SizedBox(height:13),
+            Text('Elige una respuesta para habilitar su registro.',
+              style:TextStyle(color:Global.textSecondary,fontSize:12)),
+          ],
         ],
       ]);
     }
@@ -293,7 +733,12 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
     }
     return const Text('El proceso todavía no está en una etapa comercial.');
   }
-  @override Widget build(BuildContext context){
+  @override Widget build(BuildContext context) => Obx(() => ColoredBox(
+    color: Global.bg,
+    child: _buildVista(context),
+  ));
+
+  Widget _buildVista(BuildContext context){
     final p=widget.proceso;
     return Column(children:[
       Container(color:Global.container,padding:const EdgeInsets.symmetric(horizontal:12,vertical:5),

@@ -114,7 +114,12 @@ class _ListadoProcesosFveState
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => ColoredBox(
+    color: Global.bg,
+    child: _buildVista(context),
+  ));
+
+  Widget _buildVista(BuildContext context) {
     if (cargando) {
       return const Center(
         child: CircularProgressIndicator(),

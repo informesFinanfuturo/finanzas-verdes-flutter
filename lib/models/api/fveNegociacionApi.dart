@@ -37,14 +37,32 @@ class FveNegociacionApi {
     }
     return resp;
   }
-  static Future<Uint8List> pdf(int idProceso, int idPropuesta) async {
+  static Future<Uint8List> vistaPreviaPdf(int idProceso, int idPropuesta) =>
+      _obtenerPdf(idProceso, idPropuesta, vistaPrevia: true);
+
+  static Future<Uint8List> pdf(int idProceso, int idPropuesta) =>
+      _obtenerPdf(idProceso, idPropuesta, vistaPrevia: false);
+
+  static Future<Uint8List> _obtenerPdf(int idProceso, int idPropuesta,
+      {required bool vistaPrevia}) async {
     final token=GetStorage().read('token');
+    if (token == null || token.toString().isEmpty) {
+      throw FveNegociacionException('Inicia sesion para consultar el PDF.');
+    }
+    final extra = vistaPrevia ? '/vista-previa' : '/pdf';
     late http.Response r;
     try {
-      r=await http.get(Uri.parse('${Global.baseUrl}fve/procesos/$idProceso/negociacion/propuestas/$idPropuesta/pdf'),
-        headers:{'Authorization':'Bearer $token'}).timeout(const Duration(seconds:45));
-    }catch(_){throw FveNegociacionException('No se pudo descargar el PDF. Comprueba la conexion.');}
-    if(r.statusCode != 200) throw FveNegociacionException('No se pudo descargar el PDF (${r.statusCode}).');
+      r=await http.get(Uri.parse('${Global.baseUrl}fve/procesos/$idProceso/negociacion/propuestas/$idPropuesta$extra'),
+        headers:{'Authorization':'Bearer $token'}).timeout(const Duration(seconds:90));
+    }catch(_){throw FveNegociacionException('No se pudo obtener el PDF. Comprueba la conexion.');}
+    if(r.statusCode != 200) {
+      String mensaje = 'No se pudo obtener el PDF (HTTP ${r.statusCode}).';
+      try {
+        final json = jsonDecode(utf8.decode(r.bodyBytes));
+        if (json is Map && json['error'] != null) mensaje = json['error'].toString();
+      } catch (_) {}
+      throw FveNegociacionException(mensaje);
+    }
     if(r.bodyBytes.length < 8 || !utf8.decode(r.bodyBytes.take(4).toList(),allowMalformed:true).startsWith('%PDF')) {
       throw FveNegociacionException('El servidor no devolvio un documento PDF valido.');
     }
