@@ -27,6 +27,7 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
   Uint8List? vistaPreviaBytes;
   int? vistaPreviaId;
   bool cargandoVistaPrevia=false;
+  bool _modalPresentacionAbierto=false;
   String? errorVistaPrevia;
   String? decisionElegida;
   String? errorDecision;
@@ -136,19 +137,29 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
     }
   }
   Future<void> _confirmarPresentacion() async {
-    if (trabajando || cargandoVistaPrevia || vistaPreviaBytes==null) return;
-    final aceptar=await showDialog<bool>(
-      context:context,
-      builder:(ctx)=>AlertDialog(
-        title:const Text('Emitir propuesta definitiva'),
-        content:const Text('Esta versi\u00f3n se registrar\u00e1 como presentada y no podr\u00e1 editarse. Revisa el PDF antes de continuar.'),
-        actions:[
-          TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancelar')),
-          FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Presentar propuesta')),
-        ],
-      ),
-    );
-    if (aceptar==true && mounted) await _accion('/presentar');
+    if (trabajando || cargandoVistaPrevia || vistaPreviaBytes==null || _modalPresentacionAbierto) return;
+    // El iframe web captura los clics por encima de los dialogos Flutter.
+    // Se desmonta solo durante la confirmacion y se restaura al cerrarla.
+    setState(() => _modalPresentacionAbierto=true);
+    try {
+      // Esperar a que Flutter retire el HtmlElementView del DOM.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || paso!=4) return;
+      final aceptar=await showDialog<bool>(
+        context:context,
+        builder:(ctx)=>AlertDialog(
+          title:const Text('Emitir propuesta definitiva'),
+          content:const Text('Esta versi\u00f3n se registrar\u00e1 como presentada y no podr\u00e1 editarse. Revisa el PDF antes de continuar.'),
+          actions:[
+            TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancelar')),
+            FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Presentar propuesta')),
+          ],
+        ),
+      );
+      if (aceptar==true && mounted && paso==4) await _accion('/presentar');
+    } finally {
+      if (mounted) setState(() => _modalPresentacionAbierto=false);
+    }
   }
   Future<void> _registrarDecision() async {
     if(trabajando || cargando || !mounted || paso!=5) return;
@@ -472,11 +483,13 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
         ] else if(bytes!=null && vistaPreviaId==_numero(prop?['id_propuesta'])) ...[
           SizedBox(
             height:(MediaQuery.sizeOf(context).height*0.74).clamp(520.0,860.0).toDouble(),
-            child:VisorPdfFve(
-              key:ValueKey('fve-vista-previa-${vistaPreviaId}'),
-              bytes:bytes,
-              nombreArchivo:'FVE_${idProceso}_V${prop?['numero_version']}_vista-previa.pdf',
-            ),
+            child:_modalPresentacionAbierto
+              ? const SizedBox.expand()
+              : VisorPdfFve(
+                  key:ValueKey('fve-vista-previa-${vistaPreviaId}'),
+                  bytes:bytes,
+                  nombreArchivo:'FVE_${idProceso}_V${prop?['numero_version']}_vista-previa.pdf',
+                ),
           ),
         ] else ...[
           Text(tieneBorrador ? 'La vista previa se generar\u00e1 autom\u00e1ticamente.' :
