@@ -2,8 +2,7 @@ import 'package:finanzas_verdes/app/config/Global.dart';
 import 'package:finanzas_verdes/models/api/fveApi.dart';
 import 'package:finanzas_verdes/models/api/fveNegociacionApi.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:pdf/pdf.dart';
-import 'package:printing/printing.dart';
+import 'visorPdfFveNativo.dart' if (dart.library.js_interop) 'visorPdfFveWeb.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -473,17 +472,10 @@ class _NegociacionIntegralPanelState extends State<NegociacionIntegralPanel> {
         ] else if(bytes!=null && vistaPreviaId==_numero(prop?['id_propuesta'])) ...[
           SizedBox(
             height:(MediaQuery.sizeOf(context).height*0.74).clamp(520.0,860.0).toDouble(),
-            child:PdfPreview(
+            child:VisorPdfFve(
               key:ValueKey('fve-vista-previa-${vistaPreviaId}'),
-              build:(formato) async => bytes,
-              initialPageFormat:PdfPageFormat.a4,
-              canChangePageFormat:false,
-              canChangeOrientation:false,
-              allowPrinting:false,
-              allowSharing:false,
-              canDebug:false,
-              maxPageWidth:800,
-              pdfFileName:'FVE_${idProceso}_V${prop?['numero_version']}_vista-previa.pdf',
+              bytes:bytes,
+              nombreArchivo:'FVE_${idProceso}_V${prop?['numero_version']}_vista-previa.pdf',
             ),
           ),
         ] else ...[
